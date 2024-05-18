@@ -1,0 +1,15 @@
+generated-docs/
+
+build
+app
+
+*.a
+*.tar.br
+*.tar.gz
+*.so
+*.dylib
+*.dll
+
+Cargo.lock
+
+target/
