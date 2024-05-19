@@ -1,4 +1,6 @@
 # app stub for dynamically linking to pre-process host for surgical linking
 app [main] { pf: platform "main.roc" }
 
-main = "stubbed app"
+import pf.Stdout
+
+main = Stdout.line "stubbed app"
