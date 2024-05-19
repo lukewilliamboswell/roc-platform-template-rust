@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 use core::ffi::c_void;
 use roc_std::RocStr;
 use std::io::Write;
@@ -156,7 +154,12 @@ pub unsafe fn call_the_closure(closure_data_ptr: *const u8) -> i32 {
 }
 
 /// See docs in `platform/Stdout.roc` for descriptions
-fn handleStdoutErr(io_err: std::io::Error) -> RocStr {
+///
+/// Note it would be preferable to generate the implementation for a tag union in Roc
+/// using `roc glue` and then use that here, however there is at least one bug with the current
+/// RustGlue.roc spec that needs investigation. For now we use a RocStr as a workaround and a
+/// much simpler interface between roc and the host.
+fn handle_stdout_err(io_err: std::io::Error) -> RocStr {
     match io_err.kind() {
         std::io::ErrorKind::BrokenPipe => RocStr::from("ErrorKind::BrokenPipe"),
         std::io::ErrorKind::WouldBlock => RocStr::from("ErrorKind::WouldBlock"),
@@ -178,6 +181,6 @@ pub extern "C" fn roc_fx_stdoutLine(line: &RocStr) -> roc_std::RocResult<(), Roc
         .write_all(line.as_bytes())
         .and_then(|()| handle.write_all("\n".as_bytes()))
         .and_then(|()| handle.flush())
-        .map_err(handleStdoutErr)
+        .map_err(handle_stdout_err)
         .into()
 }
