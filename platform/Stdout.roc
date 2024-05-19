@@ -34,6 +34,8 @@ Err : [
     Other Str,
 ]
 
+# Note we use a RocStr here as a workaround. Ideally we would generate the rust implementation for
+# `ErrorKind`, however glue is a WIP, so we use RocStr as this is simple and works for now.
 handleErr = \err ->
     when err is
         e if e == "ErrorKind::BrokenPipe" -> StdoutErr BrokenPipe
