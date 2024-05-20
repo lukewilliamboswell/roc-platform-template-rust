@@ -21,3 +21,7 @@ Bundle the platform source and prebuilt-binaries with `roc build --bundle .tar.b
 ## Platform documentation
 
 Generate the documentation with `roc docs platform/main.roc` and then serve the files in `generated-docs/` using a webserver.
+
+## Advaced - LLVM IR
+
+You can generate the LLVM IR for the app with `roc build --emit-llvm-ir app.roc` which is an authoritative reference for what roc will generate in the application object.

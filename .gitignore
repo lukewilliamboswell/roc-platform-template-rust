@@ -9,7 +9,13 @@ app
 *.so
 *.dylib
 *.dll
+*.ll
 
 Cargo.lock
 
 target/
+
+.DS_Store
+
+crates/roc_std/
+crates/glue.md

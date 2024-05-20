@@ -20,14 +20,18 @@ mode = DEBUG
 
 main =
 
+    # generate glue for builtins and platform
+    Cmd.exec "roc" ["glue", "glue.roc", "crates/", "platform/main.roc"]
+        |> Task.mapErr! ErrGeneratingGlue
+
     native = getNativeTarget!
-    
+
     cargoBuild! native
 
     # prebuilt binaries for the legacy linker,
     # e.g. `macos-arm64.a`
     copyBinaryToPlatform! native
-    
+
     # TODO -- uncomment when this PR is merged https://github.com/roc-lang/roc/pull/6696
     # prebuilt binaries for the surgical linker,
     # e.g. `macos-arm64.rh` and `metadata_macos-arm64.rm`
@@ -140,4 +144,3 @@ copyBinaryToPlatform = \target ->
 printInfoLine : Str -> Task {} _
 printInfoLine = \msg ->
     Stdout.line! "\u(001b)[34mBUILD INFO:\u(001b)[0m $(msg)"
-
