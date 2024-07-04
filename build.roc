@@ -2,7 +2,6 @@ app [main] {
     cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.10.0/vNe6s9hWzoTZtFmNkvEICPErI9ptji_ySjicO6CkucY.tar.br",
 }
 
-import cli.Task exposing [Task]
 import cli.Stdout
 import cli.Cmd
 
@@ -25,9 +24,7 @@ main =
         |> Task.mapErr! ErrGeneratingGlue
 
     native = getNativeTarget!
-
     cargoBuild! native
-
     # prebuilt binaries for the legacy linker,
     # e.g. `macos-arm64.a`
     copyBinaryToPlatform! native
