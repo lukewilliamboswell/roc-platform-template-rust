@@ -1,8 +1,8 @@
 platform ""
     requires {} { main : Task {} [Exit I32 Str]_ }
-    exposes [Task, Stdout]
+    exposes [Stdout]
     packages {}
-    imports [Task.{ Task }, Stdout]
+    imports [Stdout]
     provides [mainForHost]
 
 mainForHost : Task {} I32

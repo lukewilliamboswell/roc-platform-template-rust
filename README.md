@@ -4,10 +4,6 @@ This is a template for getting started with a [roc platform](https://www.roc-lan
 
 If you have any ideas to improve this template, please let me know. 😀
 
-**NOTE** the `roc_std` was been generated using `roc glue` and [this spec file](https://github.com/roc-lang/roc/blob/main/crates/glue/src/RustGlue.roc).
-
-I'm not an experienced Rust developer; any assistance with `glue.roc` spec would be most appreciated.
-
 ## Developing locally
 
 Build the platform with `roc build.roc` to produce the prebuilt-binaries in `platform/`.
