@@ -1,5 +1,5 @@
 # example of how to define an effect from the platform
-module [line, Err]
+module [line!, Err]
 
 import Effect
 
@@ -50,7 +50,7 @@ handleErr = \err ->
 ##
 ## > To write to `stdout` without the newline, see [Stdout.write].
 ##
-line : Str -> Task {} [StdoutErr Err]
-line = \str ->
-    Effect.stdoutLine str
-    |> Task.mapErr handleErr
+line! : Str => Result {} [StdoutErr Err]
+line! = \str ->
+    Effect.stdoutLine! str
+    |> Result.mapErr handleErr

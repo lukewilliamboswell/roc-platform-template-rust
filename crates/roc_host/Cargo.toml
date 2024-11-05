@@ -18,4 +18,4 @@ path = "src/main.rs"
 
 [dependencies]
 libc = "=0.2.150"
-roc_std = { git = "https://github.com/roc-lang/roc.git" }
+roc_std = { git = "https://github.com/roc-lang/roc.git", branch = "purity-inference" }
