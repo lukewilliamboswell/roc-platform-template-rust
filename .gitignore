@@ -10,6 +10,10 @@ app
 *.dylib
 *.dll
 *.ll
+*.o
+*.obj
+*.lib
+*.wasm
 
 Cargo.lock
 

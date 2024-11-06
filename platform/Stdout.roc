@@ -1,4 +1,3 @@
-# example of how to define an effect from the platform
 module [line!, Err]
 
 import Effect
