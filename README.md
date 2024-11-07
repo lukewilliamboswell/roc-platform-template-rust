@@ -21,3 +21,11 @@ Generate the documentation with `roc docs platform/main.roc` and then serve the 
 ## Advaced - LLVM IR
 
 You can generate the LLVM IR for the app with `roc build --emit-llvm-ir app.roc` which is an authoritative reference for what roc will generate in the application object.
+
+## Advanced - Generating glue
+
+I've left the file `platform/glue.roc` here to show how I currently use `roc glue` to generate the glue code for the platform. This is currently a bit of a manual process, but should be seamless in the future as it matures.
+
+```
+$ roc glue ../roc/crates/glue/src/RustGlue.roc asdf platform/glue.roc
+```

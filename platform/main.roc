@@ -7,7 +7,7 @@ platform ""
 
 import Effect
 
-mainForHost! : {} => Result {} I32
+mainForHost! : I32 => Result {} I32
 mainForHost! = \_ ->
     when main! {} is
         Ok {} -> Ok {}

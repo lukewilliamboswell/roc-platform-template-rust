@@ -32,18 +32,6 @@ Err : [
     Other Str,
 ]
 
-# Note we use a RocStr here as a workaround. Ideally we would generate the rust implementation for
-# `ErrorKind`, however glue is a WIP, so we use RocStr as this is simple and works for now.
-handleErr = \err ->
-    when err is
-        e if e == "ErrorKind::BrokenPipe" -> StdoutErr BrokenPipe
-        e if e == "ErrorKind::WouldBlock" -> StdoutErr WouldBlock
-        e if e == "ErrorKind::WriteZero" -> StdoutErr WriteZero
-        e if e == "ErrorKind::Unsupported" -> StdoutErr Unsupported
-        e if e == "ErrorKind::Interrupted" -> StdoutErr Interrupted
-        e if e == "ErrorKind::OutOfMemory" -> StdoutErr OutOfMemory
-        str -> StdoutErr (Other str)
-
 ## Write the given string to [standard output](https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)),
 ## followed by a newline.
 ##
@@ -52,4 +40,12 @@ handleErr = \err ->
 line! : Str => Result {} [StdoutErr Err]
 line! = \str ->
     Effect.stdoutLine! str
-    |> Result.mapErr handleErr
+    |> Result.mapErr \internalErr ->
+        when internalErr.tag is
+            BrokenPipe -> StdoutErr BrokenPipe
+            WouldBlock -> StdoutErr WouldBlock
+            WriteZero -> StdoutErr WriteZero
+            Unsupported -> StdoutErr Unsupported
+            Interrupted -> StdoutErr Interrupted
+            OutOfMemory -> StdoutErr OutOfMemory
+            Other -> StdoutErr (Other internalErr.msg)

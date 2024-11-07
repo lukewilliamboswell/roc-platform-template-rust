@@ -1,25 +1,7 @@
 use core::ffi::c_void;
-use roc_std::RocStr;
+use roc_std::{RocResult, RocStr};
 use std::io::Write;
-
-extern "C" {
-    #[link_name = "roc__mainForHost_1_exposed_generic"]
-    pub fn roc_main(output: *mut u8);
-
-    #[link_name = "roc__mainForHost_1_exposed_size"]
-    pub fn roc_main_size() -> i64;
-
-    #[link_name = "roc__mainForHost_0_caller"]
-    fn call_Fx(flags: *const u8, closure_data: *const u8, output: *mut roc_std::RocResult<(), i32>);
-
-    #[allow(dead_code)]
-    #[link_name = "roc__mainForHost_0_size"]
-    fn size_Fx() -> i64;
-
-    #[allow(dead_code)]
-    #[link_name = "roc__mainForHost_0_result_size"]
-    fn size_Fx_result() -> i64;
-}
+mod glue;
 
 #[no_mangle]
 pub unsafe extern "C" fn roc_alloc(size: usize, _alignment: u32) -> *mut c_void {
@@ -119,60 +101,22 @@ pub fn init() {
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> i32 {
-    init();
-    let size = unsafe { roc_main_size() } as usize;
-    let layout = core::alloc::Layout::array::<u8>(size).unwrap();
-
-    unsafe {
-        let buffer = std::alloc::alloc(layout);
-
-        roc_main(buffer);
-
-        let out = call_the_closure(buffer);
-
-        std::alloc::dealloc(buffer, layout);
-
-        return out;
+    extern "C" {
+        #[link_name = "roc__mainForHost_1_exposed"]
+        pub fn roc_main_for_host(arg_not_used: i32) -> RocResult<(), i32>;
     }
-}
 
-pub unsafe fn call_the_closure(closure_data_ptr: *const u8) -> i32 {
-    // Main always returns an i32. just allocate for that.
-    let mut out: roc_std::RocResult<(), i32> = roc_std::RocResult::ok(());
+    init();
 
-    call_Fx(
-        // This flags pointer will never get dereferenced
-        core::mem::MaybeUninit::uninit().as_ptr(),
-        closure_data_ptr as *const u8,
-        &mut out,
-    );
-
-    match out.into() {
+    let result = unsafe { roc_main_for_host(0) };
+    match result.into() {
         Ok(()) => 0,
         Err(exit_code) => exit_code,
     }
 }
 
-/// See docs in `platform/Stdout.roc` for descriptions
-///
-/// Note it would be preferable to generate the implementation for a tag union in Roc
-/// using `roc glue` and then use that here, however there is at least one bug with the current
-/// RustGlue.roc spec that needs investigation. For now we use a RocStr as a workaround and a
-/// much simpler interface between roc and the host.
-fn handle_stdout_err(io_err: std::io::Error) -> RocStr {
-    match io_err.kind() {
-        std::io::ErrorKind::BrokenPipe => RocStr::from("ErrorKind::BrokenPipe"),
-        std::io::ErrorKind::WouldBlock => RocStr::from("ErrorKind::WouldBlock"),
-        std::io::ErrorKind::WriteZero => RocStr::from("ErrorKind::WriteZero"),
-        std::io::ErrorKind::Unsupported => RocStr::from("ErrorKind::Unsupported"),
-        std::io::ErrorKind::Interrupted => RocStr::from("ErrorKind::Interrupted"),
-        std::io::ErrorKind::OutOfMemory => RocStr::from("ErrorKind::OutOfMemory"),
-        _ => RocStr::from(RocStr::from(format!("{:?}", io_err).as_str())),
-    }
-}
-
 #[no_mangle]
-pub extern "C" fn roc_fx_stdoutLine(line: &RocStr) -> roc_std::RocResult<(), RocStr> {
+pub extern "C" fn roc_fx_log(line: &RocStr) {
     let stdout = std::io::stdout();
 
     let mut handle = stdout.lock();
@@ -181,6 +125,19 @@ pub extern "C" fn roc_fx_stdoutLine(line: &RocStr) -> roc_std::RocResult<(), Roc
         .write_all(line.as_bytes())
         .and_then(|()| handle.write_all("\n".as_bytes()))
         .and_then(|()| handle.flush())
-        .map_err(handle_stdout_err)
+        .unwrap();
+}
+
+#[no_mangle]
+pub extern "C" fn roc_fx_stdoutLine(line: &RocStr) -> roc_std::RocResult<(), glue::IOErr> {
+    let stdout = std::io::stdout();
+
+    let mut handle = stdout.lock();
+
+    handle
+        .write_all(line.as_bytes())
+        .and_then(|()| handle.write_all("\n".as_bytes()))
+        .and_then(|()| handle.flush())
+        .map_err(|io_err| io_err.into())
         .into()
 }
