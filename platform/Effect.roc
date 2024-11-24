@@ -1,9 +1,26 @@
-# this module will be replaced when effect interpreters are implemented
 hosted Effect
     exposes [
-        stdoutLine,
+        InternalIOErr,
+        stdoutLine!,
+        log!,
     ]
     imports []
 
-# effects that are provided by the host
-stdoutLine : Str -> Task {} Str
+InternalIOErr : {
+    tag : [
+        EndOfFile,
+        NotFound,
+        PermissionDenied,
+        BrokenPipe,
+        AlreadyExists,
+        Interrupted,
+        Unsupported,
+        OutOfMemory,
+        Other,
+    ],
+    msg : Str,
+}
+
+stdoutLine! : Str => Result {} InternalIOErr
+
+log! : Str => {}
