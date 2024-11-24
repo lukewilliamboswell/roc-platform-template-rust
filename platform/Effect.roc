@@ -1,4 +1,3 @@
-# this module will be replaced when effect interpreters are implemented
 hosted Effect
     exposes [
         InternalIOErr,
@@ -8,20 +7,20 @@ hosted Effect
     imports []
 
 InternalIOErr : {
-    tag: [
+    tag : [
+        EndOfFile,
+        NotFound,
+        PermissionDenied,
         BrokenPipe,
-        WouldBlock,
-        WriteZero,
-        Unsupported,
+        AlreadyExists,
         Interrupted,
+        Unsupported,
         OutOfMemory,
         Other,
     ],
-    msg: Str,
+    msg : Str,
 }
 
-
-# effects that are provided by the host
 stdoutLine! : Str => Result {} InternalIOErr
 
 log! : Str => {}

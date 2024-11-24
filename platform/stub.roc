@@ -3,4 +3,5 @@ app [main!] { pf: platform "main.roc" }
 
 import pf.Stdout
 
-main! = Stdout.line! "stubbed app"
+main! = \{} ->
+    Stdout.line! "stubbed app"

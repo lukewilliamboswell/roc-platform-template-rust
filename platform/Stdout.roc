@@ -2,32 +2,28 @@ module [line!, Err]
 
 import Effect
 
-## **BrokenPipe** - This error can occur when writing to a stdout that is no longer connected
-## to a valid input. For example, if the process on the receiving end of a pipe closes its
-## end, any write to that pipe could lead to a BrokenPipe error.
+## **NotFound** - An entity was not found, often a file.
 ##
-## **WouldBlock** - This error might occur if stdout is set to non-blocking mode and the write
-## operation would block because the output buffer is full.
+## **PermissionDenied** - The operation lacked the necessary privileges to complete.
 ##
-## **WriteZero** - This indicates an attempt to write "zero" bytes which is technically a no-operation
-## (no-op), but if detected, it could be raised as an error.
+## **BrokenPipe** - The operation failed because a pipe was closed.
 ##
-## **Unsupported** - If the stdout operation involves writing data in a manner or format that is not
-## supported, this error could be raised.
+## **AlreadyExists** - An entity already exists, often a file.
 ##
-## **Interrupted** - This can happen if a signal interrupts the writing process before it completes.
+## **Interrupted** - This operation was interrupted. Interrupted operations can typically be retried.
 ##
-## **OutOfMemory** - This could occur if there is not enough memory available to buffer the data being
-## written to stdout.
+## **Unsupported** - This operation is unsupported on this platform. This means that the operation can never succeed.
 ##
-## **Other** - This is a catch-all for any error not specifically categorized by the other ErrorKind
-## variants.
+## **OutOfMemory** - An operation could not be completed, because it failed to allocate enough memory.
+##
+## **Other** - A custom error that does not fall under any other I/O error kind.
 Err : [
+    NotFound,
+    PermissionDenied,
     BrokenPipe,
-    WouldBlock,
-    WriteZero,
-    Unsupported,
+    AlreadyExists,
     Interrupted,
+    Unsupported,
     OutOfMemory,
     Other Str,
 ]
@@ -42,10 +38,11 @@ line! = \str ->
     Effect.stdoutLine! str
     |> Result.mapErr \internalErr ->
         when internalErr.tag is
+            NotFound -> StdoutErr NotFound
+            PermissionDenied -> StdoutErr PermissionDenied
             BrokenPipe -> StdoutErr BrokenPipe
-            WouldBlock -> StdoutErr WouldBlock
-            WriteZero -> StdoutErr WriteZero
-            Unsupported -> StdoutErr Unsupported
+            AlreadyExists -> StdoutErr AlreadyExists
             Interrupted -> StdoutErr Interrupted
+            Unsupported -> StdoutErr Unsupported
             OutOfMemory -> StdoutErr OutOfMemory
-            Other -> StdoutErr (Other internalErr.msg)
+            Other | EndOfFile -> StdoutErr (Other internalErr.msg)
