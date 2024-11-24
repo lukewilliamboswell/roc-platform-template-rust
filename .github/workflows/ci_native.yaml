@@ -29,8 +29,18 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: fetch latest release
-        run: curl -fOL https://github.com/roc-lang/roc/releases/download/nightly/${{ matrix.roc-archive }}
+      - name: Does init() in platform/src/lib.rs contain all roc_fx functions? (Imperfect check)
+        run: cat platform/src/lib.rs | grep -oP 'roc_fx_[^(\s]*' | sort | uniq -u | grep -q . && exit 1 || exit 0
+
+      - id: try_fetching_testing_release
+        continue-on-error: true
+        run: |
+          curl -fOL https://github.com/roc-lang/roc/releases/download/nightly/roc_nightly-linux_x86_64-TESTING.tar.gz
+
+      - name: There are no TESTING releases, checking regular releases instead
+        if: steps.try_fetching_testing_release.outcome == 'failure'
+        run: |
+          curl -fOL https://github.com/roc-lang/roc/releases/download/nightly/roc_nightly-linux_x86_64-latest.tar.gz
 
       - name: rename nightly tar
         run: mv $(ls | grep "roc_nightly.*tar\.gz") roc_nightly.tar.gz

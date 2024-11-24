@@ -24,30 +24,41 @@
             overlays = [ (import rust-overlay) ];
             pkgs = import nixpkgs { inherit system overlays; };
 
-            rocPkgs = roc.packages.${system};
-
             rust = pkgs.rust-bin.fromRustupToolchainFile "${toString ./rust-toolchain.toml}";
 
-            linuxDeps = if pkgs.stdenv.isLinux then [] else [];
-            macosDeps = if pkgs.stdenv.isDarwin then [] else [];
+            rocPkgs = roc.packages.${system};
+
+            linuxInputs = with pkgs;
+              lib.optionals stdenv.isLinux [
+                valgrind
+              ];
+
+            darwinInputs = with pkgs;
+              lib.optionals stdenv.isDarwin
+              (with pkgs.darwin.apple_sdk.frameworks; [
+                Security
+              ]);
+
+            sharedInputs = (with pkgs; [
+              rust
+              expect
+              rocPkgs.cli
+            ]);
 
         in {
 
             devShell = pkgs.mkShell {
 
-                packages = [
-                        rocPkgs.cli
-                        rust
-                    ] ++ linuxDeps ++ macosDeps;
+                buildInputs = sharedInputs ++ darwinInputs ++ linuxInputs;
 
                 shellHook = ''
                     if [ "$(uname)" = "Darwin" ]; then
                         export SDKROOT=$(xcrun --show-sdk-path)
-                        export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath macosDeps}:$LD_LIBRARY_PATH
+                        export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath darwinInputs}:$LD_LIBRARY_PATH
                     fi
 
                     if [ "$(uname)" = "Linux" ]; then
-                        export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath linuxDeps}:$LD_LIBRARY_PATH
+                        export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath linuxInputs}:$LD_LIBRARY_PATH
                     fi
                 '';
             };
