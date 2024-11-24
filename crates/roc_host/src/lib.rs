@@ -1,5 +1,5 @@
 use core::ffi::c_void;
-use roc_std::{RocResult, RocStr};
+use roc_std::RocStr;
 use std::io::Write;
 mod glue;
 
@@ -103,16 +103,18 @@ pub fn init() {
 pub extern "C" fn rust_main() -> i32 {
     extern "C" {
         #[link_name = "roc__mainForHost_1_exposed"]
-        pub fn roc_main_for_host(arg_not_used: i32) -> RocResult<(), i32>;
+        pub fn roc_main_for_host(arg_not_used: i32) -> i32;
     }
 
     init();
 
-    let result = unsafe { roc_main_for_host(0) };
-    match result.into() {
-        Ok(()) => 0,
-        Err(exit_code) => exit_code,
+    let exit_code = unsafe { roc_main_for_host(0) };
+
+    if exit_code != 0 {
+        print!("Exited with code {exit_code}\n");
     }
+
+    exit_code
 }
 
 #[no_mangle]

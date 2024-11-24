@@ -1,7 +1,10 @@
 generated-docs/
 
 build
-app
+
+examples/hello
+examples/exit_code_msg
+examples/exit_tag
 
 *.a
 *.tar.br

@@ -7,17 +7,17 @@ platform ""
 
 import Effect
 
-mainForHost! : I32 => Result {} I32
+mainForHost! : I32 => I32
 mainForHost! = \_ ->
     when main! {} is
-        Ok {} -> Ok {}
+        Ok {} -> 0
         Err (Exit code str) ->
             if Str.isEmpty str then
-                Err code
+                code
             else
                 Effect.log! str
-                Err code
+                code
 
-        Err err ->
-            Effect.log! "Program exited early with error: $(Inspect.toStr err)"
-            Err 1
+        Err other ->
+            Effect.log! "Program exited early with error: $(Inspect.toStr other)"
+            1

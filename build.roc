@@ -9,7 +9,7 @@ import cli.Arg
 import cli.Arg.Opt as Opt
 import cli.Arg.Cli as Cli
 
-## Builds the basic-cli [platform](https://www.roc-lang.org/platforms).
+## Builds the [platform](https://www.roc-lang.org/platforms).
 ##
 ## run with: roc ./build.roc
 ##
