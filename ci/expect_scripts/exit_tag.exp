@@ -7,9 +7,9 @@ set timeout 7
 
 source ./ci/expect_scripts/shared-code.exp
 
-spawn $env(EXAMPLES_DIR)exit_tag
+spawn $env(EXAMPLES_DIR)/exit_tag
 
-expect "Roc loves Rust\r\nProgram exited early with error: (SomeTag \"Message\" 42)\r\nExited with code 1\r\n" {
+expect "Roc loves Rust\r\nProgram exited early with error: (SomeTag \"Message\" 42)\r\n" {
     expect eof {
         check_exit_and_segfault
     }

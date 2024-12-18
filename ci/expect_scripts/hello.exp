@@ -7,9 +7,9 @@ set timeout 7
 
 source ./ci/expect_scripts/shared-code.exp
 
-spawn $env(EXAMPLES_DIR)hello
+spawn $env(EXAMPLES_DIR)/hello
 
-expect "Roc loves Rust\r\n" {
+expect "Roc loves Rust -- here's an AST {defs: \"Some defs...\", header: \"Some header...\"}\r\n" {
     expect eof {
         check_exit_and_segfault
     }
