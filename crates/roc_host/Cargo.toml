@@ -1,10 +1,13 @@
 [package]
 name = "roc_host"
-version = "0.0.1"
-authors = ["The Roc Contributors"]
-license = "UPL-1.0"
-edition = "2021"
+description = "This provides the [host](https://github.com/roc-lang/roc/wiki/Roc-concepts-explained#host) implementation for the platform."
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+version.workspace = true
 
 [dependencies]
 libc.workspace = true
 roc_std.workspace = true
+roc_ast.workspace = true

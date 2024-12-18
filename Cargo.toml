@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/roc_host", "crates/roc_host_lib"]
+members = ["crates/roc_host", "crates/roc_ast", "crates/roc_host_lib"]
+
+[workspace.package]
+version = "0.0.1"
+authors = ["The Contributors"]
+license = "UPL-1.0"
+edition = "2021"
 
 [profile.release]
 lto = true
@@ -15,3 +21,4 @@ strip = "debuginfo"
 libc = "=0.2.150"
 roc_std = { git = "https://github.com/roc-lang/roc.git" }
 roc_host = { path = "crates/roc_host" }
+roc_ast = { path = "crates/roc_ast" }

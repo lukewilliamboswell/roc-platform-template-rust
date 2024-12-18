@@ -1,0 +1,11 @@
+[package]
+name = "roc_ast"
+description = "Roc glue types for working with the roc parser AST"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+roc_std.workspace = true

@@ -1,7 +1,6 @@
 use core::ffi::c_void;
 use roc_std::{RocList, RocStr};
 use std::io::Write;
-mod ast;
 mod glue;
 
 #[no_mangle]
@@ -105,20 +104,28 @@ pub extern "C" fn rust_main(_args: RocList<RocStr>) -> i32 {
     // TODO
     // parse the ast here using crates from roc-lang/roc
 
-    let ast = ast::Ast {
+    let ast = roc_ast::Ast {
         defs: "Some defs...".into(),
-        header: "Some header...".into(),
+        header: roc_ast::SpacesBefore {
+            before: roc_ast::CommentOrNewline {
+                str: "Some comment...".into(),
+                tag: roc_ast::CommentOrNewlineTag::DocComment,
+            },
+            item: "Some item...".into(),
+        },
     };
 
     extern "C" {
         #[link_name = "roc__main_for_host_1_exposed"]
-        pub fn caller(ast: *const ast::Ast) -> i32;
+        pub fn caller(ast: *const roc_ast::Ast) -> i32;
 
         #[link_name = "roc__main_for_host_1_exposed_size"]
         pub fn size() -> i64;
     }
 
     init();
+
+    dbg!(&ast);
 
     unsafe {
         let result = caller(&ast);
