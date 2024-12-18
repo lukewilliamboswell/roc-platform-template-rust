@@ -1,23 +1,24 @@
 platform ""
-    requires {} { main! : {} => Result {} [Exit I32 Str]_ }
-    exposes [Stdout]
+    requires {} { main! : Ast => Result {} [Exit I32 Str]_ }
+    exposes [Stdout, Ast]
     packages {}
     imports []
-    provides [mainForHost!]
+    provides [main_for_host!]
 
-import Effect
+import Host
+import Ast exposing [Ast]
 
-mainForHost! : I32 => I32
-mainForHost! = \_ ->
-    when main! {} is
+main_for_host! : Ast => I32
+main_for_host! = \ast ->
+    when main! ast is
         Ok {} -> 0
         Err (Exit code str) ->
             if Str.isEmpty str then
                 code
             else
-                Effect.log! str
+                Host.log! str
                 code
 
         Err other ->
-            Effect.log! "Program exited early with error: $(Inspect.toStr other)"
+            Host.log! "Program exited early with error: $(Inspect.toStr other)"
             1

@@ -1,6 +1,9 @@
-module [line!, Err]
+module [
+    Err,
+    line!,
+]
 
-import Effect
+import Host
 
 ## **NotFound** - An entity was not found, often a file.
 ##
@@ -32,9 +35,9 @@ Err : [
 ## followed by a newline.
 line! : Str => Result {} [StdoutErr Err]
 line! = \str ->
-    Effect.stdoutLine! str
-    |> Result.mapErr \internalErr ->
-        when internalErr.tag is
+    Host.stdout_line! str
+    |> Result.mapErr \internal_err ->
+        when internal_err.tag is
             NotFound -> StdoutErr NotFound
             PermissionDenied -> StdoutErr PermissionDenied
             BrokenPipe -> StdoutErr BrokenPipe
@@ -42,4 +45,4 @@ line! = \str ->
             Interrupted -> StdoutErr Interrupted
             Unsupported -> StdoutErr Unsupported
             OutOfMemory -> StdoutErr OutOfMemory
-            Other | EndOfFile -> StdoutErr (Other internalErr.msg)
+            Other | EndOfFile -> StdoutErr (Other internal_err.msg)

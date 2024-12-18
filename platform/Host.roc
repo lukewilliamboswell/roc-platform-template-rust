@@ -1,7 +1,7 @@
-hosted Effect
+hosted Host
     exposes [
         InternalIOErr,
-        stdoutLine!,
+        stdout_line!,
         log!,
     ]
     imports []
@@ -21,6 +21,6 @@ InternalIOErr : {
     msg : Str,
 }
 
-stdoutLine! : Str => Result {} InternalIOErr
+stdout_line! : Str => Result {} InternalIOErr
 
 log! : Str => {}

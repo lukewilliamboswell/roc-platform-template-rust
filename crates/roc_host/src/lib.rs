@@ -1,6 +1,7 @@
 use core::ffi::c_void;
-use roc_std::RocStr;
+use roc_std::{RocList, RocStr};
 use std::io::Write;
+mod ast;
 mod glue;
 
 #[no_mangle]
@@ -87,7 +88,7 @@ pub fn init() {
         roc_panic as _,
         roc_dbg as _,
         roc_memset as _,
-        roc_fx_stdoutLine as _,
+        roc_fx_stdout_line as _,
     ];
     #[allow(forgetting_references)]
     std::mem::forget(std::hint::black_box(funcs));
@@ -100,21 +101,36 @@ pub fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn rust_main() -> i32 {
+pub extern "C" fn rust_main(_args: RocList<RocStr>) -> i32 {
+    // TODO
+    // parse the ast here using crates from roc-lang/roc
+
+    let ast = ast::Ast {
+        defs: "Some defs...".into(),
+        header: "Some header...".into(),
+    };
+
     extern "C" {
-        #[link_name = "roc__mainForHost_1_exposed"]
-        pub fn roc_main_for_host(arg_not_used: i32) -> i32;
+        #[link_name = "roc__main_for_host_1_exposed"]
+        pub fn caller(ast: *const ast::Ast) -> i32;
+
+        #[link_name = "roc__main_for_host_1_exposed_size"]
+        pub fn size() -> i64;
     }
 
     init();
 
-    let exit_code = unsafe { roc_main_for_host(0) };
+    unsafe {
+        let result = caller(&ast);
 
-    if exit_code != 0 {
-        print!("Exited with code {exit_code}\n");
+        // roc now owns ast and will cleanup, so we forget them here
+        // to prevent rust from dropping.
+        std::mem::forget(ast);
+
+        debug_assert_eq!(std::mem::size_of_val(&result) as i64, size());
+
+        result
     }
-
-    exit_code
 }
 
 #[no_mangle]
@@ -131,7 +147,7 @@ pub extern "C" fn roc_fx_log(line: &RocStr) {
 }
 
 #[no_mangle]
-pub extern "C" fn roc_fx_stdoutLine(line: &RocStr) -> roc_std::RocResult<(), glue::IOErr> {
+pub extern "C" fn roc_fx_stdout_line(line: &RocStr) -> roc_std::RocResult<(), glue::IOErr> {
     let stdout = std::io::stdout();
 
     let mut handle = stdout.lock();

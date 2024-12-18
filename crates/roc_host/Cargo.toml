@@ -5,17 +5,6 @@ authors = ["The Roc Contributors"]
 license = "UPL-1.0"
 edition = "2021"
 
-links = "app"
-
-[lib]
-name = "roc_host"
-path = "src/lib.rs"
-crate-type = ["lib"]
-
-[[bin]]
-name = "host"
-path = "src/main.rs"
-
 [dependencies]
-libc = "=0.2.150"
-roc_std = { git = "https://github.com/roc-lang/roc.git" }
+libc.workspace = true
+roc_std.workspace = true
