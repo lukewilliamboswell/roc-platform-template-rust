@@ -19,6 +19,7 @@ strip = "debuginfo"
 
 [workspace.dependencies]
 libc = "=0.2.150"
+roc_parse = { git = "https://github.com/roc-lang/roc.git" }
 roc_std = { git = "https://github.com/roc-lang/roc.git" }
 roc_host = { path = "crates/roc_host" }
 roc_ast = { path = "crates/roc_ast" }

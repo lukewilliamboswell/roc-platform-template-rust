@@ -1,10 +1,15 @@
-use roc_std::{roc_refcounted_noop_impl, RocRefcounted, RocStr};
+mod header;
+mod spaced;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+use crate::header::{Header, ModuleHeader};
+use crate::spaced::Spaced;
+use roc_std::{roc_refcounted_noop_impl, RocList, RocRefcounted, RocStr};
+
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct Ast {
     pub defs: RocStr,
-    pub header: SpacesBefore,
+    pub header: SpacesBefore<Header>,
 }
 
 impl RocRefcounted for Ast {
@@ -21,7 +26,7 @@ impl RocRefcounted for Ast {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Clone, Copy)]
 #[repr(u8)]
 pub enum CommentOrNewlineTag {
     DocComment = 0,
@@ -41,7 +46,7 @@ impl core::fmt::Debug for CommentOrNewlineTag {
 
 roc_refcounted_noop_impl!(CommentOrNewlineTag);
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct CommentOrNewline {
     pub str: RocStr,
@@ -60,14 +65,17 @@ impl RocRefcounted for CommentOrNewline {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Clone, Debug)]
 #[repr(C)]
-pub struct SpacesBefore {
-    pub before: CommentOrNewline,
-    pub item: RocStr,
+pub struct SpacesBefore<T> {
+    pub before: RocList<CommentOrNewline>,
+    pub item: T,
 }
 
-impl RocRefcounted for SpacesBefore {
+impl<T> RocRefcounted for SpacesBefore<T>
+where
+    T: RocRefcounted,
+{
     fn inc(&mut self) {
         self.before.inc();
         self.item.inc();
@@ -75,6 +83,42 @@ impl RocRefcounted for SpacesBefore {
     fn dec(&mut self) {
         self.before.dec();
         self.item.dec();
+    }
+    fn is_refcounted() -> bool {
+        true
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+#[repr(transparent)]
+pub struct Position {
+    pub offset: u32,
+}
+
+roc_refcounted_noop_impl!(Position);
+
+#[derive(Clone, Copy, Default, Debug)]
+#[repr(C)]
+pub struct Region {
+    pub end: Position,
+    pub start: Position,
+}
+
+roc_refcounted_noop_impl!(Region);
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct Loc {
+    pub value: Spaced,
+    pub region: Region,
+}
+
+impl RocRefcounted for Loc {
+    fn inc(&mut self) {
+        self.value.inc();
+    }
+    fn dec(&mut self) {
+        self.value.dec();
     }
     fn is_refcounted() -> bool {
         true

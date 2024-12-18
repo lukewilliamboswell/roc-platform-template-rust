@@ -11,3 +11,4 @@ version.workspace = true
 libc.workspace = true
 roc_std.workspace = true
 roc_ast.workspace = true
+roc_parse.workspace = true

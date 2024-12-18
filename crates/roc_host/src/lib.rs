@@ -3,11 +3,15 @@ use roc_std::{RocList, RocStr};
 use std::io::Write;
 mod glue;
 
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_alloc(size: usize, _alignment: u32) -> *mut c_void {
-    return libc::malloc(size);
+    libc::malloc(size)
 }
 
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_realloc(
     c_ptr: *mut c_void,
@@ -15,14 +19,18 @@ pub unsafe extern "C" fn roc_realloc(
     _old_size: usize,
     _alignment: u32,
 ) -> *mut c_void {
-    return libc::realloc(c_ptr, new_size);
+    libc::realloc(c_ptr, new_size)
 }
 
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_dealloc(c_ptr: *mut c_void, _alignment: u32) {
-    return libc::free(c_ptr);
+    libc::free(c_ptr);
 }
 
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_panic(msg: *mut RocStr, tag_id: u32) {
     match tag_id {
@@ -37,23 +45,31 @@ pub unsafe extern "C" fn roc_panic(msg: *mut RocStr, tag_id: u32) {
     std::process::exit(1);
 }
 
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_dbg(loc: *mut RocStr, msg: *mut RocStr, src: *mut RocStr) {
     eprintln!("[{}] {} = {}", &*loc, &*src, &*msg);
 }
 
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_memset(dst: *mut c_void, c: i32, n: usize) -> *mut c_void {
     libc::memset(dst, c, n)
 }
 
 #[cfg(unix)]
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_getppid() -> libc::pid_t {
     libc::getppid()
 }
 
 #[cfg(unix)]
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_mmap(
     addr: *mut libc::c_void,
@@ -67,6 +83,8 @@ pub unsafe extern "C" fn roc_mmap(
 }
 
 #[cfg(unix)]
+/// # Safety
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn roc_shm_open(
     name: *const libc::c_char,
@@ -103,15 +121,22 @@ pub fn init() {
 pub extern "C" fn rust_main(_args: RocList<RocStr>) -> i32 {
     // TODO
     // parse the ast here using crates from roc-lang/roc
+    let roc_module_header = roc_parse::header::ModuleHeader {
+        after_keyword: &[],
+        params: None,
+        exposes: roc_parse::ast::Collection::default(),
+        interface_imports: None,
+    };
+    let roc_header = roc_parse::ast::Header::Module(roc_module_header);
 
     let ast = roc_ast::Ast {
         defs: "Some defs...".into(),
         header: roc_ast::SpacesBefore {
-            before: roc_ast::CommentOrNewline {
+            before: RocList::from_slice(&[roc_ast::CommentOrNewline {
                 str: "Some comment...".into(),
                 tag: roc_ast::CommentOrNewlineTag::DocComment,
-            },
-            item: "Some item...".into(),
+            }]),
+            item: roc_header.into(),
         },
     };
 
@@ -124,8 +149,6 @@ pub extern "C" fn rust_main(_args: RocList<RocStr>) -> i32 {
     }
 
     init();
-
-    dbg!(&ast);
 
     unsafe {
         let result = caller(&ast);
