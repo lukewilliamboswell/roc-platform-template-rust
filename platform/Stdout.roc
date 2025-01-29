@@ -31,15 +31,17 @@ Err : [
 ## Write the given string to [standard output](https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)),
 ## followed by a newline.
 line! : Str => Result {} [StdoutErr Err]
-line! = \str ->
-    Effect.stdoutLine! str
-    |> Result.mapErr \internalErr ->
-        when internalErr.tag is
-            NotFound -> StdoutErr NotFound
-            PermissionDenied -> StdoutErr PermissionDenied
-            BrokenPipe -> StdoutErr BrokenPipe
-            AlreadyExists -> StdoutErr AlreadyExists
-            Interrupted -> StdoutErr Interrupted
-            Unsupported -> StdoutErr Unsupported
-            OutOfMemory -> StdoutErr OutOfMemory
-            Other | EndOfFile -> StdoutErr (Other internalErr.msg)
+line! = |str|
+    Effect.stdout_line!(str)
+    |> Result.map_err(
+        |internal_err|
+            when internal_err.tag is
+                NotFound -> StdoutErr(NotFound)
+                PermissionDenied -> StdoutErr(PermissionDenied)
+                BrokenPipe -> StdoutErr(BrokenPipe)
+                AlreadyExists -> StdoutErr(AlreadyExists)
+                Interrupted -> StdoutErr(Interrupted)
+                Unsupported -> StdoutErr(Unsupported)
+                OutOfMemory -> StdoutErr(OutOfMemory)
+                Other | EndOfFile -> StdoutErr(Other(internal_err.msg)),
+    )

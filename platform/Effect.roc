@@ -1,10 +1,8 @@
-hosted Effect
-    exposes [
-        InternalIOErr,
-        stdoutLine!,
-        log!,
-    ]
-    imports []
+hosted [
+    InternalIOErr,
+    stdout_line!,
+    log!,
+]
 
 InternalIOErr : {
     tag : [
@@ -21,6 +19,6 @@ InternalIOErr : {
     msg : Str,
 }
 
-stdoutLine! : Str => Result {} InternalIOErr
+stdout_line! : Str => Result {} InternalIOErr
 
 log! : Str => {}
