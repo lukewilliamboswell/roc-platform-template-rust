@@ -87,7 +87,7 @@ pub fn init() {
         roc_panic as _,
         roc_dbg as _,
         roc_memset as _,
-        roc_fx_stdoutLine as _,
+        roc_fx_stdout_line as _,
     ];
     #[allow(forgetting_references)]
     std::mem::forget(std::hint::black_box(funcs));
@@ -102,7 +102,7 @@ pub fn init() {
 #[no_mangle]
 pub extern "C" fn rust_main() -> i32 {
     extern "C" {
-        #[link_name = "roc__mainForHost_1_exposed"]
+        #[link_name = "roc__main_for_host_1_exposed"]
         pub fn roc_main_for_host(arg_not_used: i32) -> i32;
     }
 
@@ -131,7 +131,7 @@ pub extern "C" fn roc_fx_log(line: &RocStr) {
 }
 
 #[no_mangle]
-pub extern "C" fn roc_fx_stdoutLine(line: &RocStr) -> roc_std::RocResult<(), glue::IOErr> {
+pub extern "C" fn roc_fx_stdout_line(line: &RocStr) -> roc_std::RocResult<(), glue::IOErr> {
     let stdout = std::io::stdout();
 
     let mut handle = stdout.lock();
