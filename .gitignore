@@ -1,32 +1,36 @@
+# Build artifacts
+target/
 generated-docs/
 
-build
+# Roc source (built from pinned commit in CI)
+roc-src/
 
-examples/hello
-examples/exit_code_msg
-examples/exit_tag
-
+# Platform binaries
 *.a
-*.tar.br
-*.tar.gz
 *.so
 *.dylib
 *.dll
-*.ll
+
+# Object files
 *.o
 *.obj
 *.lib
-*.wasm
+
+# Roc build artifacts
 *.rh
 *.rm
+*.wasm
+*.ll
 
-Cargo.lock
+# Archives
+*.tar.br
+*.tar.gz
 
-target/
-
+# OS files
 .DS_Store
 
-crates/roc_std/
-crates/glue.md
+# Cargo lock (we're a library/binary, not an application)
+Cargo.lock
 
+# Claude Code
 .claude
