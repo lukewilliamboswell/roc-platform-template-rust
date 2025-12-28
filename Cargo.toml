@@ -18,3 +18,4 @@ roc_std_new = { git = "https://github.com/roc-lang/roc", rev = "8753d9a30189d878
 [profile.release]
 lto = true
 strip = "debuginfo"
+panic = "abort"
