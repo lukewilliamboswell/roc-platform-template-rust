@@ -8,8 +8,8 @@ platform ""
         exe: {
             x64mac: ["libhost.a", app],
             arm64mac: ["libhost.a", app],
-            x64musl: ["crt1.o", "libhost.a", app, "libc.a"],
-            arm64musl: ["crt1.o", "libhost.a", app, "libc.a"],
+            x64musl: ["crt1.o", "libhost.a", "libunwind.a", app, "libc.a"],
+            arm64musl: ["crt1.o", "libhost.a", "libunwind.a", app, "libc.a"],
             x64win: ["host.lib", app],
             arm64win: ["host.lib", app],
         }

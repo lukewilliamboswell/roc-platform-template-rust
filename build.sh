@@ -24,9 +24,6 @@ fi
 
 echo "Building for target: $TARGET"
 
-# Ensure panic=abort is applied (required for musl static linking)
-export RUSTFLAGS="${RUSTFLAGS:-} -C panic=abort"
-
 # Build host library
 cargo build --release --lib
 

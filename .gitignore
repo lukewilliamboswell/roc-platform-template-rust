@@ -9,9 +9,10 @@ roc-src/
 *.so
 *.dylib
 *.dll
-# Ignore .a files except musl libc
+# Ignore .a files except musl runtime libraries
 *.a
 !platform/targets/*/libc.a
+!platform/targets/*/libunwind.a
 
 # Object files (but not musl crt1.o)
 *.obj
