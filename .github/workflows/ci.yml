@@ -35,7 +35,7 @@ jobs:
           version: 0.15.2
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Run all tests
         run: bash ci/all_tests.sh
