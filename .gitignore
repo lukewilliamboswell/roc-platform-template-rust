@@ -5,16 +5,19 @@ generated-docs/
 # Roc source (built from pinned commit in CI)
 roc-src/
 
-# Platform binaries
-*.a
+# Platform binaries (but not musl runtime files)
 *.so
 *.dylib
 *.dll
+# Ignore .a files except musl libc
+*.a
+!platform/targets/*/libc.a
 
-# Object files
-*.o
+# Object files (but not musl crt1.o)
 *.obj
 *.lib
+*.o
+!platform/targets/*/crt1.o
 
 # Roc build artifacts
 *.rh
