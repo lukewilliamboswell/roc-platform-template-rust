@@ -1,54 +1,60 @@
 # Roc platform template for Rust
 
-This is a template for getting started with a [roc platform](https://www.roc-lang.org/platforms) using [Rust](https://www.rust-lang.org).
+A template for building [Roc platforms](https://www.roc-lang.org/platforms) using [Rust](https://www.rust-lang.org).
 
-If you have any ideas to improve this template, please let me know. 😀
+## Requirements
 
-## Developing locally
+- [Rust](https://rustup.rs/) (stable)
+- [Roc](https://www.roc-lang.org/) (built from source, see CI for pinned commit)
 
-### Step 0. Dev environment
+## Examples
 
-Dependencies:
-- Nix package manager `nix develop`
-- Otherwise ensure you have Roc and Cargo installed
+Run examples with interpreter: `roc examples/<name>.roc`
 
-### Step 1. Build the platform
+Build standalone executable: `roc build examples/<name>.roc`
 
-```
-$ roc build.roc
-```
+## Building
 
-Build the platform with `roc build.roc` to produce the prebuilt-binaries in `platform/`.
+```bash
+# Build for native platform only
+./build.sh
 
-### Step 2. Run an example
-
-After the platform is build, you can run an example using `roc`.
-
-```
-$ roc examples/hello.roc
-Roc loves Rust
+# Build for all supported targets (cross-compilation)
+./build.sh --all
 ```
 
-### Step 3. Run all the tests
+## Bundling
 
-```
-$ ROC=roc EXAMPLES_DIR=examples/ ./ci/all_tests.sh
-```
-
-## Packaging the platform
-
-Bundle the platform first using `roc build.roc`, and then create a bundle with:
-
-```
-$ roc build --bundle .tar.br platform/main.roc
+```bash
+./bundle.sh
 ```
 
-This will package up all the `*.roc` files a prebuilt host files `*.a` `*.rh` etc from `platform/` and give you a file like `platform/GusyN64cWI5ri8GtTv90sgKKjEtj2i8GXKaWhI0-Tk8.tar.br` which you can distribute to other users by hosting online and sharing the URL.
+This creates a `.tar.zst` bundle containing all `.roc` files and prebuilt host libraries.
 
-## Platform documentation
+## Running Tests
 
-Generate the documentation with `roc docs platform/main.roc` and then serve the files in `generated-docs/` using a webserver.
+```bash
+bash ci/all_tests.sh
+```
 
-## Advaced - LLVM IR
+This builds Roc from the pinned commit, builds the platform, and runs all examples.
 
-You can generate the LLVM IR for the app with `roc build --no-link --emit-llvm-ir examples/hello.roc` which is an authoritative reference for what roc will generate in the application object.
+## Supported Targets
+
+| Target | Library |
+|--------|---------|
+| x64mac | `platform/targets/x64mac/libhost.a` |
+| arm64mac | `platform/targets/arm64mac/libhost.a` |
+| x64musl | `platform/targets/x64musl/libhost.a` |
+| arm64musl | `platform/targets/arm64musl/libhost.a` |
+
+Linux musl targets include statically linked runtime files (`crt1.o`, `libc.a`, `libunwind.a`) for standalone executables.
+
+## Platform API
+
+This platform exposes:
+- `Stdout.line!` - Print a line to stdout
+- `Stderr.line!` - Print a line to stderr
+- `Stdin.line!` - Read a line from stdin
+
+The main function receives command-line arguments as `List(Str)` and returns `Try({}, [Exit(I32)])`.
