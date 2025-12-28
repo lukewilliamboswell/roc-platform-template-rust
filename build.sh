@@ -38,8 +38,8 @@ detect_native_target() {
     fi
 }
 
-# Build for a specific target
-build_target() {
+# Build for a specific target (cross-compile)
+build_target_cross() {
     local target_name=$1
     local rust_triple=$(get_rust_triple "$target_name")
 
@@ -48,6 +48,18 @@ build_target() {
 
     mkdir -p "platform/targets/$target_name"
     cp "target/$rust_triple/release/libhost.a" "platform/targets/$target_name/"
+    echo "  -> platform/targets/$target_name/libhost.a"
+}
+
+# Build for native target (no cross-compile needed)
+build_target_native() {
+    local target_name=$1
+
+    echo "Building for $target_name (native)..."
+    cargo build --release --lib
+
+    mkdir -p "platform/targets/$target_name"
+    cp "target/release/libhost.a" "platform/targets/$target_name/"
     echo "  -> platform/targets/$target_name/libhost.a"
 }
 
@@ -64,20 +76,20 @@ if [ "${1:-}" = "--all" ]; then
     done
     echo ""
 
-    # Build each target
+    # Build each target (cross-compile)
     for target_name in $ALL_TARGETS; do
-        build_target "$target_name"
+        build_target_cross "$target_name"
         echo ""
     done
 
     echo "All targets built successfully!"
 else
-    # Build for native target only
+    # Build for native target only (no cross-compile)
     TARGET=$(detect_native_target)
     echo "Building for native target: $TARGET"
     echo ""
 
-    build_target "$TARGET"
+    build_target_native "$TARGET"
 
     echo ""
     echo "Build complete!"
