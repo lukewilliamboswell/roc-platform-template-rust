@@ -147,10 +147,10 @@ find . -type d -name "roc-src" -prune -o -type f -name "*.roc" -print | while re
     fi
 done
 
-# Build docs
-echo ""
-echo "=== Building docs ==="
-roc docs platform/main.roc
+# TODO: Enable when roc docs supports new platform header format
+# echo ""
+# echo "=== Building docs ==="
+# roc docs platform/main.roc
 
 echo ""
 if [ $FAILED -eq 0 ]; then
