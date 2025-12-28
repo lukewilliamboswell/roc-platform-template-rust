@@ -26,9 +26,10 @@ roc-src/
 *.wasm
 *.ll
 
-# Archives
+# Archives (platform bundles)
 *.tar.br
 *.tar.gz
+*.tar.zst
 
 # OS files
 .DS_Store

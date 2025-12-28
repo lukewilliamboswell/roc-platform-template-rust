@@ -50,10 +50,15 @@ export PATH="$(pwd)/roc-src/zig-out/bin:$PATH"
 echo ""
 echo "Using roc version: $(roc version)"
 
-# Build the platform
-echo ""
-echo "=== Building platform ==="
-./build.sh
+# Build the platform (skip if SKIP_BUILD is set, used when testing bundled platform)
+if [ "${SKIP_BUILD:-}" != "1" ]; then
+    echo ""
+    echo "=== Building platform ==="
+    ./build.sh
+else
+    echo ""
+    echo "=== Skipping platform build (SKIP_BUILD=1) ==="
+fi
 
 # Run all examples
 echo ""
