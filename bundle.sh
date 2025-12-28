@@ -1,24 +1,29 @@
-# ADD TARGETS
-rustup target add aarch64-apple-darwin
-rustup target add x86_64-unknown-linux-gnu
-rustup target add x86_64-apple-darwin
-rustup target add aarch64-unknown-linux-gnu
+#!/usr/bin/env bash
+set -euo pipefail
 
-# LEGACY LINKER ARTEFACTS
-cargo build --release --lib --target=aarch64-apple-darwin
-cp target/aarch64-apple-darwin/release/libhost.a platform/macos-arm64.a
+root_dir="$(cd "$(dirname "$0")" && pwd)"
+cd "$root_dir/platform"
 
-cargo build --release --lib --target=aarch64-unknown-linux-gnu
-cp target/aarch64-unknown-linux-gnu/release/libhost.a platform/linux-arm64.a
+# Collect all .roc files
+roc_files=(*.roc)
 
-cargo build --release --lib --target=x86_64-unknown-linux-gnu
-cp target/x86_64-unknown-linux-gnu/release/libhost.a platform/linux-x64.a
+# Collect all host libraries and runtime files from targets directories
+lib_files=()
+for lib in targets/*/*.a targets/*/*.o; do
+    if [[ -f "$lib" ]]; then
+        lib_files+=("$lib")
+    fi
+done
 
-cargo build --release --lib --target=x86_64-apple-darwin
-cp target/aarch64-apple-darwin/release/libhost.a platform/macos-x64.a
+echo "Bundling ${#roc_files[@]} .roc files and ${#lib_files[@]} library files..."
+echo ""
+echo "Files to bundle:"
+for f in "${roc_files[@]}"; do
+    echo "  $f"
+done
+for f in "${lib_files[@]}"; do
+    echo "  $f"
+done
+echo ""
 
-# SURGICAL LINKER ARTEFACTS
-# TODO -- the surgical prebuilt hosts will need to be build on the native machines I think
-
-# BUNDLE INTO PACKAGE
-roc build --bundle .tar.br platform/main.roc
+roc bundle "${roc_files[@]}" "${lib_files[@]}" --output-dir "$root_dir" "$@"

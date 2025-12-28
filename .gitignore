@@ -1,30 +1,41 @@
+# Build artifacts
+target/
 generated-docs/
 
-build
+# Roc source (built from pinned commit in CI)
+roc-src/
 
-examples/hello
-examples/exit_code_msg
-examples/exit_tag
-
-*.a
-*.tar.br
-*.tar.gz
+# Platform binaries (but not musl runtime files)
 *.so
 *.dylib
 *.dll
-*.ll
-*.o
+# Ignore .a files except musl runtime libraries
+*.a
+!platform/targets/*/libc.a
+!platform/targets/*/libunwind.a
+
+# Object files (but not musl crt1.o)
 *.obj
 *.lib
-*.wasm
+*.o
+!platform/targets/*/crt1.o
+
+# Roc build artifacts
 *.rh
 *.rm
+*.wasm
+*.ll
 
-Cargo.lock
+# Archives (platform bundles)
+*.tar.br
+*.tar.gz
+*.tar.zst
 
-target/
-
+# OS files
 .DS_Store
 
-crates/roc_std/
-crates/glue.md
+# Cargo lock (we're a library/binary, not an application)
+Cargo.lock
+
+# Claude Code
+.claude
