@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main, new-abi]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-14        # Apple Silicon
-          - macos-13        # Intel Mac
-          - ubuntu-22.04    # Linux x86_64
+          - macos-14 # Apple Silicon
+          - macos-13 # Intel Mac
+          - ubuntu-22.04 # Linux x86_64
           - ubuntu-24.04-arm # Linux ARM64
     defaults:
       run:
