@@ -51,15 +51,30 @@ build_target_cross() {
     echo "  -> platform/targets/$target_name/libhost.a"
 }
 
-# Build for native target (no cross-compile needed)
+# Build for native target
+# On macOS: no --target needed (native is fine)
+# On Linux: must use --target for musl, since default is glibc
 build_target_native() {
     local target_name=$1
+    local rust_triple=$(get_rust_triple "$target_name")
 
     echo "Building for $target_name (native)..."
-    cargo build --release --lib
 
-    mkdir -p "platform/targets/$target_name"
-    cp "target/release/libhost.a" "platform/targets/$target_name/"
+    # On macOS, native build is fine
+    # On Linux, we must explicitly target musl (default is glibc)
+    if [[ "$target_name" == *"musl"* ]]; then
+        # Linux: need explicit musl target
+        rustup target add "$rust_triple" 2>/dev/null || true
+        cargo build --release --lib --target "$rust_triple"
+        mkdir -p "platform/targets/$target_name"
+        cp "target/$rust_triple/release/libhost.a" "platform/targets/$target_name/"
+    else
+        # macOS: native is fine
+        cargo build --release --lib
+        mkdir -p "platform/targets/$target_name"
+        cp "target/release/libhost.a" "platform/targets/$target_name/"
+    fi
+
     echo "  -> platform/targets/$target_name/libhost.a"
 }
 
