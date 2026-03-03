@@ -5,7 +5,7 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 ## Requirements
 
 - [Rust](https://rustup.rs/) (stable)
-- [Roc](https://www.roc-lang.org/) (built from source, see CI for pinned commit)
+- [Roc](https://www.roc-lang.org/) (built from the commit pinned in `.roc-version`)
 
 ## Examples
 
@@ -23,6 +23,16 @@ Build standalone executable: `roc build examples/<name>.roc`
 ./build.sh --all
 ```
 
+## Regenerating glue
+
+When the platform API changes (e.g. adding or modifying hosted functions in `platform/main.roc`), regenerate the Rust ABI bindings:
+
+```bash
+roc experimental-glue <path-to>/RustGlue.roc ./src/ platform/main.roc
+```
+
+This overwrites `src/roc_platform_abi.rs` with updated type definitions and dispatch tables.
+
 ## Bundling
 
 ```bash
@@ -37,7 +47,7 @@ This creates a `.tar.zst` bundle containing all `.roc` files and prebuilt host l
 bash ci/all_tests.sh
 ```
 
-This builds Roc from the pinned commit, builds the platform, and runs all examples.
+This builds the platform and runs all examples. If `roc` is already on your PATH at the pinned commit, it will be used directly; otherwise it will be built from source.
 
 ## Supported Targets
 
