@@ -99,7 +99,7 @@ effect_demo! : Str => {}
 effect_demo! = |msg|
 	Stdout.line!(msg)
 
-# TODO issue #8646
+# TODO issue #9170
 # question_postfix : List(Str) -> Try(I64, _)
 # question_postfix = |strings| {
 #     # `?` to immediately return the error if there is one
@@ -118,6 +118,32 @@ for_loop = |num_list| {
 
 	for num in num_list {
 		$sum = $sum + num
+	}
+
+	$sum
+}
+
+# break exits a for or while loop early
+break_in_for_loop = |bool_list| {
+    var $allTrue = True
+    for b in bool_list {
+        if b == False {
+            $allTrue = False
+            break
+        } else {
+            {}
+        }
+    }
+    $allTrue
+}
+
+while_loop = |limit| {
+	var $count = 0
+	var $sum = 0
+
+	while $count < limit {
+		$sum = $sum + $count
+		$count = $count + 1
 	}
 
 	$sum
@@ -144,13 +170,13 @@ if_demo = |num| {
 	# every if must have an else branch!
 	one_line_if = if num == 1 "One" else "NotOne"
 
-	two_line_if = 
+	two_line_if =
 		if num == 2
 			"Two"
 		else
 			"NotTwo"
 
-	with_curlies = 
+	with_curlies =
 	    if num == 5 {
 	        "Five"
 	    } else {
@@ -166,7 +192,7 @@ if_demo = |num| {
 		one_line_if.concat(two_line_if).concat(with_curlies)
 }
 
-tuple_demo = 
+tuple_demo =
 # tuples can contain multiple types
 	("Roc", 1)
 
@@ -197,27 +223,40 @@ record_update_2 = |person| {
 }
 
 number_literals = {
-	usage_based: 5, # Dec by default
-	explicit_u8: 5u8,
-	explicit_i8: 5i8,
-	explicit_u16: 5u16,
-	explicit_i16: 5i16,
-	explicit_u32: 5u32,
-	explicit_i32: 5i32,
-	explicit_u64: 5u64,
-	explicit_i64: 5i64,
-	explicit_u128: 5u128,
-	explicit_i128: 5i128,
-	explicit_f32: 5.0f32,
-	explicit_f64: 5.0f64,
-	explicit_dec: 5.0dec,
+	usage_based: 5, # defaults to Dec
+	explicit_u8: 5.U8, # Note that most of the time you will want to specify the type in the type signature instead.
+	explicit_i8: 5.I8,
+	explicit_u16: 5.U16,
+	explicit_i16: 5.I16,
+	explicit_u32: 5.U32,
+	explicit_i32: 5.I32,
+	explicit_u64: 5.U64,
+	explicit_i64: 5.I64,
+	explicit_u128: 5.U128,
+	explicit_i128: 5.I128,
+	# Note: F32, F64, and Dec literals use type inference which doesn't work with Str.inspect so they are omitted here.
 	hex: 0x5,
 	octal: 0o5,
 	binary: 0b0101,
 }
 
 # Opaque type
-Username :: Str
+# Useful if you want to hide fields e.g. so users of the type can not access some implementation detail you did not want to expose.
+Secret :: {
+	key : Str
+}.{
+	new : Str -> Secret
+	new = |k| { key: k }
+
+	unlock : Secret, Str -> Str
+	unlock = |secret, password| {
+		if password == "open sesame" {
+			"The secret key is: ${secret.key}"
+		} else {
+			"Wrong password!"
+		}
+	}
+}
 
 # Define a nominal type with a custom is_eq method
 Animal := [Dog(Str), Cat(Str)].{
@@ -229,7 +268,7 @@ Animal := [Dog(Str), Cat(Str)].{
 }
 
 early_return = |arg| {
-	first = 
+	first =
 		if !arg {
 			return 99
 		} else {
@@ -241,6 +280,36 @@ early_return = |arg| {
 }
 
 my_concat = Str.concat
+
+# Tags can have multiple payloads
+multi_payload_tag : [Foo(I64, Str), Bar] -> Str
+multi_payload_tag = |tag| match tag {
+	Foo(num, name) => "Foo with ${num.to_str()} and ${name}"
+	Bar => "Just Bar"
+}
+
+# Mark a tag union as open using `..`.
+# This function accepts any tag union containing at least Red and Green.
+color_to_str : [Red, Green, ..] -> Str
+color_to_str = |color| match color {
+	Red => "red"
+	Green => "green"
+	_ => "other color"
+}
+
+# TODO: Closed tag unions with `..[]]` - syntax not implemented yet
+# str_to_color : Str -> [Red, Green, Blue, Other, ..[]]
+
+# Type alias for an extensible tag union. You can use a type var (`others`) like so:
+Letters(others) : [A, B, ..others]
+
+# Use the type alias in a function signature. Pass `[C]` as `others`.
+letter_to_str : Letters([C]) -> Str
+letter_to_str = |letter| match letter {
+	A => "A"
+	B => "B"
+	_ => "other letter"
+}
 
 # If you want to define a function that works for any type that has a specific method, you can use `where`:
 stringify : a -> Str where [a.to_str : a -> Str]
@@ -276,6 +345,12 @@ main! = |_args| {
 
 	expect sum == 15
 
+	all_true = break_in_for_loop([True, True, False, True, True])
+	print!(all_true)
+
+    while_sum = while_loop(5)
+	print!(while_sum)
+
 	print!(dbg_keyword())
 
 	Stdout.line!(if_demo(2))
@@ -294,9 +369,10 @@ main! = |_args| {
 
 	print!(number_literals)
 
-	# TODO: not implemented yet.
-	# bob = @Username("Bob")
-	# Stdout.line!("Username: ${bob}")
+	secret = Secret.new("my_secret_key")
+	# This print will not expose internal data.
+	print!(secret)
+	print!(secret.unlock("open sesame"))
 
 	dog : Animal
 	dog = Dog("Fido")
@@ -307,6 +383,17 @@ main! = |_args| {
 	print!(early_return(Bool.False))
 
 	print!(stringify(12345))
+
+	# Tags with multiple payloads
+	print!(multi_payload_tag(Foo(42, "hello")))
+
+	# Open tag unions with `..`
+	# This function accepts [Red, Green, ..] so we can pass Blue too
+	print!(color_to_str(Blue))
+
+	# Type alias for extensible tag union
+	print!(letter_to_str(A))
+	print!(letter_to_str(C)) # C is not in [A, B] but we passed it in the signature of letter_to_str
 
 	# TODO Stdout.line!(readme);
 
