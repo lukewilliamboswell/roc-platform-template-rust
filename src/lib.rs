@@ -17,10 +17,6 @@ extern "C" {
     fn roc__main_for_host(ops: *const RocOps, ret_ptr: *mut c_void, args_ptr: *mut c_void);
 }
 
-// ============================================================================
-// Hosted Functions (sorted alphabetically by fully-qualified name)
-// ============================================================================
-
 /// Hosted function: Stderr.line! (index 0)
 /// Takes Str, returns {}
 extern "C" fn hosted_stderr_line(
@@ -106,18 +102,17 @@ pub fn rust_main() -> i32 {
         stdout_line: hosted_stdout_line,
     };
 
+    // Boxed so the pointer remains stable — Roc holds a reference for the duration of the call.
     let roc_ops = Box::new(make_roc_ops(core::ptr::null_mut(), hosted_functions(&fns)));
 
-    // Build List(Str) from command-line arguments
-    let args_list = build_args_list(&roc_ops);
+    let mut args_list = build_args_list(&roc_ops);
 
-    // Call the Roc main function
     let mut exit_code: i32 = -99;
     unsafe {
         roc__main_for_host(
             &*roc_ops,
             &mut exit_code as *mut i32 as *mut c_void,
-            &args_list as *const RocList<RocStr> as *mut c_void,
+            &mut args_list as *mut RocList<RocStr> as *mut c_void,
         );
     }
 
