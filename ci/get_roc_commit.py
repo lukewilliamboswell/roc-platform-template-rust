@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-"""Extract the roc commit hash from Cargo.toml."""
+"""Read the roc commit hash from .roc-version."""
 
-import re
 from pathlib import Path
 
 
 def main() -> None:
-    cargo_toml_path = Path(__file__).resolve().parent.parent / "Cargo.toml"
+    version_path = Path(__file__).resolve().parent.parent / ".roc-version"
     try:
-        contents = cargo_toml_path.read_text()
+        commit = version_path.read_text().strip()
     except FileNotFoundError:
-        raise SystemExit(f"Missing Cargo.toml at {cargo_toml_path}")
+        raise SystemExit(f"Missing .roc-version at {version_path}")
 
-    # Match the rev = "..." in the roc_std_new dependency
-    match = re.search(r'roc-lang/roc.*rev\s*=\s*"([0-9a-fA-F]{40})"', contents)
-    if not match:
-        raise SystemExit("Could not find roc commit in Cargo.toml")
+    if not commit:
+        raise SystemExit(".roc-version is empty")
 
-    print(match.group(1))
+    print(commit)
 
 
 if __name__ == "__main__":

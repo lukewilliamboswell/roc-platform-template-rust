@@ -5,15 +5,13 @@ edition = "2021"
 
 [lib]
 name = "host"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
 
 [[bin]]
 name = "host"
 path = "src/main.rs"
 
 [dependencies]
-libc = "0.2"
-roc_std_new = { git = "https://github.com/roc-lang/roc", rev = "8753d9a30189d878b54d2a4981becf88ad4bbb1a" }
 
 [profile.release]
 lto = true
