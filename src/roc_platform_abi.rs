@@ -278,15 +278,27 @@ impl core::fmt::Debug for RocStr {
 
 /// A generic Roc list. Elements are reference-counted and heap-allocated.
 ///
-/// This type is ABI-compatible with the Zig RocList (24 bytes, `#[repr(C)]`).
+/// When `ELEMENTS_REFCOUNTED` is true (the default via `RocList<T>`), an extra
+/// `ptr_width` bytes are reserved in the allocation header for the element count,
+/// matching the Roc runtime's `allocateWithRefcount` layout.
+pub type RocList<T> = RocListWith<T, true>;
+
+/// Parameterized list constructor; use `RocList<T>` for refcounted elements.
 #[repr(C)]
-pub struct RocList<T> {
+pub struct RocListWith<T, const ELEMENTS_REFCOUNTED: bool> {
     pub elements: *mut T,
     pub length: usize,
     pub capacity_or_alloc_ptr: usize,
 }
 
-impl<T> RocList<T> {
+impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
+    #[inline]
+    fn header_bytes() -> usize {
+        let ptr_width = core::mem::size_of::<usize>();
+        let required_space = if ELEMENTS_REFCOUNTED { 2 * ptr_width } else { ptr_width };
+        required_space.max(core::mem::align_of::<T>())
+    }
+
     /// Return an empty RocList.
     pub fn empty() -> Self {
         Self {
@@ -323,9 +335,7 @@ impl<T> RocList<T> {
             return Self::empty();
         }
         let align = core::mem::align_of::<T>().max(core::mem::align_of::<usize>());
-        // Elements are assumed refcounted (safe default): reserve 2 * ptr_width.
-        let required_space = 2 * core::mem::size_of::<usize>();
-        let header_bytes = required_space.max(core::mem::align_of::<T>());
+        let header_bytes = Self::header_bytes();
         let data_bytes = length * core::mem::size_of::<T>();
         let total = data_bytes + header_bytes;
         let base = unsafe { roc_ops.alloc(align, total) };
@@ -364,9 +374,7 @@ impl<T> RocList<T> {
             return;
         }
         let align = core::mem::align_of::<T>().max(core::mem::align_of::<usize>());
-        // Must match the header_bytes used during allocation.
-        let required_space = 2 * core::mem::size_of::<usize>();
-        let header_bytes = required_space.max(core::mem::align_of::<T>());
+        let header_bytes = Self::header_bytes();
         unsafe {
             let rc = (self.elements as *mut isize).sub(1);
             let prev = *rc;
@@ -379,7 +387,7 @@ impl<T> RocList<T> {
     }
 }
 
-impl<T: core::fmt::Debug> core::fmt::Debug for RocList<T> {
+impl<T: core::fmt::Debug, const ELEMENTS_REFCOUNTED: bool> core::fmt::Debug for RocListWith<T, ELEMENTS_REFCOUNTED> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.as_slice().iter()).finish()
     }
