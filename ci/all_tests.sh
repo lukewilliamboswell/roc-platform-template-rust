@@ -44,7 +44,19 @@ if [ "$NEED_BUILD" = true ]; then
   git fetch --depth 1 origin "$ROC_COMMIT"
   git checkout --detach "$ROC_COMMIT"
 
-  zig build roc
+  # Retry zig build up to 3 times (Zig package fetches can be flaky in CI)
+  for attempt in 1 2 3; do
+    echo "zig build roc (attempt $attempt)..."
+    if zig build roc; then
+      break
+    fi
+    if [ $attempt -eq 3 ]; then
+      echo "zig build roc failed after 3 attempts"
+      exit 1
+    fi
+    echo "Retrying in 10 seconds..."
+    sleep 10
+  done
 
   # Add to GITHUB_PATH if running in CI
   if [ -n "${GITHUB_PATH:-}" ]; then
