@@ -20,13 +20,14 @@ extern "C" {
 /// Hosted function: Stderr.line! (index 0)
 /// Takes Str, returns {}
 extern "C" fn hosted_stderr_line(
-    _ops: *const RocOps,
+    ops: *const RocOps,
     _ret_ptr: *mut c_void,
     args_ptr: *const StderrLineArgs,
 ) {
     unsafe {
         let message = (*args_ptr).arg0.as_str();
         let _ = writeln!(io::stderr(), "{}", message);
+        (*args_ptr).arg0.decref(&*ops);
     }
 }
 
@@ -58,13 +59,14 @@ extern "C" fn hosted_stdin_line(
 /// Hosted function: Stdout.line! (index 2)
 /// Takes Str, returns {}
 extern "C" fn hosted_stdout_line(
-    _ops: *const RocOps,
+    ops: *const RocOps,
     _ret_ptr: *mut c_void,
     args_ptr: *const StdoutLineArgs,
 ) {
     unsafe {
         let message = (*args_ptr).arg0.as_str();
         let _ = writeln!(io::stdout(), "{}", message);
+        (*args_ptr).arg0.decref(&*ops);
     }
 }
 
