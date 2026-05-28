@@ -28,7 +28,7 @@ Build standalone executable: `roc build examples/<name>.roc`
 When the platform API changes (e.g. adding or modifying hosted functions in `platform/main.roc`), regenerate the Rust ABI bindings:
 
 ```bash
-roc experimental-glue <path-to>/RustGlue.roc ./src/ platform/main.roc
+roc glue <path-to>/RustGlue.roc ./src/ platform/main.roc
 ```
 
 This overwrites `src/roc_platform_abi.rs` with updated type definitions and dispatch tables.
