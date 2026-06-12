@@ -209,6 +209,125 @@ run_suite() {
   run_roc_tests "$test_root" "$label"
 }
 
+detect_native_target() {
+  local arch
+  local os
+  arch=$(uname -m)
+  os=$(uname -s)
+
+  if [ "$os" = "Darwin" ]; then
+    if [ "$arch" = "arm64" ]; then
+      echo "arm64mac"
+    else
+      echo "x64mac"
+    fi
+  elif [ "$os" = "Linux" ]; then
+    if [ "$arch" = "aarch64" ]; then
+      echo "arm64musl"
+    else
+      echo "x64musl"
+    fi
+  else
+    echo "Unsupported OS: $os" >&2
+    return 1
+  fi
+}
+
+target_inputs_for_roc() {
+  case "$1" in
+    x64mac|arm64mac)
+      echo '"libhost.a", app'
+      ;;
+    x64musl|arm64musl)
+      echo '"crt1.o", "libhost.a", "libunwind.a", app, "libc.a"'
+      ;;
+    *)
+      echo "Unknown target: $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+copy_native_target_files() {
+  local native_target=$1
+  local platform_dir=$2
+  local target_dir="$platform_dir/targets/$native_target"
+
+  mkdir -p "$target_dir"
+
+  case "$native_target" in
+    x64mac|arm64mac)
+      cp "platform/targets/$native_target/libhost.a" "$target_dir/"
+      ;;
+    x64musl|arm64musl)
+      cp "platform/targets/$native_target/crt1.o" "$target_dir/"
+      cp "platform/targets/$native_target/libhost.a" "$target_dir/"
+      cp "platform/targets/$native_target/libunwind.a" "$target_dir/"
+      cp "platform/targets/$native_target/libc.a" "$target_dir/"
+      ;;
+    *)
+      echo "Unknown target: $native_target" >&2
+      return 1
+      ;;
+  esac
+}
+
+write_native_target_platform_main() {
+  local native_target=$1
+  local output_path=$2
+  local target_inputs
+  target_inputs=$(target_inputs_for_roc "$native_target")
+
+  awk -v target="$native_target" -v inputs="$target_inputs" '
+    /^    targets: \{/ {
+      print "    targets: {"
+      print "        inputs: \"targets/\","
+      print "        " target ": { inputs: [" inputs "] },"
+      print "    }"
+      skip = 1
+      next
+    }
+    skip && /^    }$/ {
+      skip = 0
+      next
+    }
+    !skip { print }
+  ' platform/main.roc > "$output_path"
+}
+
+create_native_bundle() {
+  local temp_root=$1
+  local native_target
+  native_target=$(detect_native_target)
+
+  if [ ! -f "platform/targets/$native_target/libhost.a" ]; then
+    echo "Native host archive missing for $native_target; building it first..."
+    ./build.sh
+  fi
+
+  local platform_dir="$temp_root/platform"
+  mkdir -p "$platform_dir"
+
+  cp platform/Stderr.roc "$platform_dir/"
+  cp platform/Stdin.roc "$platform_dir/"
+  cp platform/Stdout.roc "$platform_dir/"
+  write_native_target_platform_main "$native_target" "$platform_dir/main.roc"
+  copy_native_target_files "$native_target" "$platform_dir"
+
+  echo "Bundling native target package for $native_target..."
+  (
+    cd "$platform_dir"
+    roc_files=(*.roc)
+    lib_files=()
+    for lib in targets/*/*.a targets/*/*.o; do
+      if [[ -f "$lib" ]]; then
+        lib_files+=("$lib")
+      fi
+    done
+    roc bundle "${roc_files[@]}" "${lib_files[@]}" --output-dir "$temp_root"
+  )
+}
+
 copy_examples_for_package_url() {
   local package_url=$1
   local dest_dir=$2
@@ -261,8 +380,18 @@ run_bundle_suite() {
 
   if [ -z "$package_url" ]; then
     local bundle_output
-    bundle_output=$(./bundle.sh 2>&1)
+    local bundle_status
+    set +e
+    bundle_output=$(create_native_bundle "$temp_root" 2>&1)
+    bundle_status=$?
+    set -e
     echo "$bundle_output"
+
+    if [ $bundle_status -ne 0 ]; then
+      echo "Error: bundle creation failed"
+      FAILED=1
+      return
+    fi
 
     local bundle_path
     bundle_path=$(echo "$bundle_output" | grep "^Created:" | awk '{print $2}')

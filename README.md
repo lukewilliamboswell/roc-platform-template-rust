@@ -49,7 +49,7 @@ bash ci/all_tests.sh
 
 This builds the platform and runs all examples. If `roc` is already on your PATH at the pinned commit, it will be used directly; otherwise it will be built from source.
 
-The script also bundles the platform, serves it over localhost, rewrites temporary copies of the examples to use the package URL, and runs the examples again against the bundled package.
+The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use the package URL, and runs the examples again against the bundled package.
 
 Useful focused runs:
 
