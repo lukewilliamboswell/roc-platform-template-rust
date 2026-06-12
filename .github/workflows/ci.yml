@@ -30,10 +30,10 @@ jobs:
       - name: Install Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run all tests
+      - name: Run local and bundled package tests
         run: bash ci/all_tests.sh

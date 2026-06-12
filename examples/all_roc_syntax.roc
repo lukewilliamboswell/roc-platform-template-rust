@@ -154,6 +154,7 @@ print! = |something| {
 }
 
 dbg_keyword = || {
+	foo : I64
 	foo = 42
 
 	# dbg sets exit code to 1 in this platform, so we comment it out for CI tests to pass.
@@ -201,13 +202,15 @@ type_var : List(a) -> List(a)
 type_var = |lst| lst
 
 destructuring = || {
-    tup = ("Roc", 1)
-    (str, num) = tup
+	tup : (Str, I64)
+	tup = ("Roc", 1)
+	(str, num) = tup
 
-    rec = { x: 1, y: str } # TODO implement tuple access with `.index` ?
-    { x, y } = rec
+	rec : { x : I64, y : Str }
+	rec = { x: 1, y: str } # TODO implement tuple access with `.index` ?
+	{ x, y } = rec
 
-    (str, num, x, y)
+	(str, num, x, y)
 }
 
 # TODO not sure if still planned for implementation

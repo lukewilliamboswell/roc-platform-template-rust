@@ -31,7 +31,7 @@ jobs:
       - name: Install Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: Install Rust with cross-compilation targets
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +49,18 @@ jobs:
           git fetch --depth 1 origin "$ROC_COMMIT"
           git checkout --detach "$ROC_COMMIT"
 
-          zig build roc
+          for attempt in 1 2 3; do
+            echo "zig build roc (attempt $attempt)..."
+            if zig build roc; then
+              break
+            fi
+            if [ $attempt -eq 3 ]; then
+              echo "zig build roc failed after 3 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10 seconds..."
+            sleep 10
+          done
 
           echo "$(pwd)/zig-out/bin" >> "$GITHUB_PATH"
 
@@ -107,7 +118,7 @@ jobs:
       - name: Install Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -123,7 +134,18 @@ jobs:
           git fetch --depth 1 origin "$ROC_COMMIT"
           git checkout --detach "$ROC_COMMIT"
 
-          zig build roc
+          for attempt in 1 2 3; do
+            echo "zig build roc (attempt $attempt)..."
+            if zig build roc; then
+              break
+            fi
+            if [ $attempt -eq 3 ]; then
+              echo "zig build roc failed after 3 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10 seconds..."
+            sleep 10
+          done
 
           echo "$(pwd)/zig-out/bin" >> "$GITHUB_PATH"
 
@@ -152,24 +174,11 @@ jobs:
           echo "HTTP server started on port 8000 (PID: $HTTP_SERVER_PID)"
           echo "Bundle accessible at: http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}"
 
-      - name: Modify examples to use bundled platform
-        run: |
-          # Replace local platform path with HTTP URL in all examples
-          for example in examples/*.roc; do
-            sed -i.bak "s|platform \"../platform/main.roc\"|platform \"http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}\"|g" "$example"
-          done
-
-          # Show diff for verification
-          echo "Modified examples:"
-          git diff examples/ | head -50
-
       - name: Run tests with bundled platform
         run: |
-          # Set environment variable to skip native build step
-          export SKIP_BUILD=1
-
-          # Run all tests against the bundled platform
-          bash ci/all_tests.sh
+          PACKAGE_URL="http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}" \
+            RUN_LOCAL_TESTS=0 \
+            bash ci/all_tests.sh
 
   create-release:
     name: Create GitHub Release
