@@ -35,5 +35,5 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run all tests
+      - name: Run local and bundled package tests
         run: bash ci/all_tests.sh

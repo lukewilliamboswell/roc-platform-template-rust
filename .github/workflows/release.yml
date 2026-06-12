@@ -152,24 +152,11 @@ jobs:
           echo "HTTP server started on port 8000 (PID: $HTTP_SERVER_PID)"
           echo "Bundle accessible at: http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}"
 
-      - name: Modify examples to use bundled platform
-        run: |
-          # Replace local platform path with HTTP URL in all examples
-          for example in examples/*.roc; do
-            sed -i.bak "s|platform \"../platform/main.roc\"|platform \"http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}\"|g" "$example"
-          done
-
-          # Show diff for verification
-          echo "Modified examples:"
-          git diff examples/ | head -50
-
       - name: Run tests with bundled platform
         run: |
-          # Set environment variable to skip native build step
-          export SKIP_BUILD=1
-
-          # Run all tests against the bundled platform
-          bash ci/all_tests.sh
+          PACKAGE_URL="http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}" \
+            RUN_LOCAL_TESTS=0 \
+            bash ci/all_tests.sh
 
   create-release:
     name: Create GitHub Release

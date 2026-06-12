@@ -49,6 +49,18 @@ bash ci/all_tests.sh
 
 This builds the platform and runs all examples. If `roc` is already on your PATH at the pinned commit, it will be used directly; otherwise it will be built from source.
 
+The script also bundles the platform, serves it over localhost, rewrites temporary copies of the examples to use the package URL, and runs the examples again against the bundled package.
+
+Useful focused runs:
+
+```bash
+# Skip the package URL pass
+RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
+
+# Test only a package URL
+RUN_LOCAL_TESTS=0 PACKAGE_URL="http://localhost:8000/<bundle>.tar.zst" bash ci/all_tests.sh
+```
+
 ## Supported Targets
 
 | Target | Library |
