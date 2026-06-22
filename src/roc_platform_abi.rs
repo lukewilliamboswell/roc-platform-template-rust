@@ -13,12 +13,7 @@
 //! 2. Implement each hosted function according to its signature
 //! 3. Call `hosted_functions()` to create the dispatch table for RocOps
 
-#![allow(
-    non_camel_case_types,
-    dead_code,
-    unused_imports,
-    clippy::missing_safety_doc
-)]
+#![allow(non_camel_case_types, dead_code, unused_imports, clippy::missing_safety_doc)]
 
 use core::ffi::c_void;
 use std::alloc::Layout;
@@ -72,9 +67,7 @@ pub const fn roc_erased_callable_payload_size(capture_size: usize) -> usize {
 }
 
 #[inline]
-pub unsafe fn roc_erased_callable_payload_ptr(
-    callable: RocErasedCallable,
-) -> *mut RocErasedCallablePayload {
+pub unsafe fn roc_erased_callable_payload_ptr(callable: RocErasedCallable) -> *mut RocErasedCallablePayload {
     callable as *mut RocErasedCallablePayload
 }
 
@@ -92,18 +85,12 @@ pub unsafe fn roc_erased_callable_allocate(
     let ptr_width = core::mem::size_of::<usize>();
     let alignment = core::cmp::max(ptr_width, ROC_ERASED_CALLABLE_PAYLOAD_ALIGNMENT);
     let extra_bytes = core::cmp::max(ptr_width, ROC_ERASED_CALLABLE_PAYLOAD_ALIGNMENT);
-    let base = roc_ops.alloc(
-        alignment,
-        extra_bytes + roc_erased_callable_payload_size(capture_size),
-    ) as *mut u8;
+    let base = roc_ops.alloc(alignment, extra_bytes + roc_erased_callable_payload_size(capture_size)) as *mut u8;
     let data = base.add(extra_bytes);
     let rc = data.sub(core::mem::size_of::<isize>()) as *mut isize;
     *rc = 1;
     let payload = roc_erased_callable_payload_ptr(data);
-    *payload = RocErasedCallablePayload {
-        callable_fn_ptr,
-        on_drop,
-    };
+    *payload = RocErasedCallablePayload { callable_fn_ptr, on_drop };
     data
 }
 
@@ -333,11 +320,7 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
     #[inline]
     fn header_bytes() -> usize {
         let ptr_width = core::mem::size_of::<usize>();
-        let required_space = if ELEMENTS_REFCOUNTED {
-            2 * ptr_width
-        } else {
-            ptr_width
-        };
+        let required_space = if ELEMENTS_REFCOUNTED { 2 * ptr_width } else { ptr_width };
         required_space.max(core::mem::align_of::<T>())
     }
 
@@ -414,16 +397,17 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
     }
 
     /// Create a RocList from a slice, copying elements into a new allocation.
-    pub fn from_slice(slice: &[T], roc_ops: &RocOps) -> Self
-    where
-        T: Copy,
-    {
+    pub fn from_slice(slice: &[T], roc_ops: &RocOps) -> Self where T: Copy {
         if slice.is_empty() {
             return Self::empty();
         }
         let list = Self::allocate(slice.len(), roc_ops);
         unsafe {
-            core::ptr::copy_nonoverlapping(slice.as_ptr(), list.elements, slice.len());
+            core::ptr::copy_nonoverlapping(
+                slice.as_ptr(),
+                list.elements,
+                slice.len(),
+            );
         }
         list
     }
@@ -454,9 +438,7 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
     }
 }
 
-impl<T: core::fmt::Debug, const ELEMENTS_REFCOUNTED: bool> core::fmt::Debug
-    for RocListWith<T, ELEMENTS_REFCOUNTED>
-{
+impl<T: core::fmt::Debug, const ELEMENTS_REFCOUNTED: bool> core::fmt::Debug for RocListWith<T, ELEMENTS_REFCOUNTED> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.as_slice().iter()).finish()
     }
@@ -532,7 +514,7 @@ pub struct PlatformHostedFns {
 pub fn hosted_functions(fns: &PlatformHostedFns) -> HostedFunctions {
     let ptrs: &'static [HostedFn] = Box::leak(Box::new([
         unsafe { core::mem::transmute(fns.stderr_line as *const ()) }, // Stderr.line! (index 0)
-        unsafe { core::mem::transmute(fns.stdin_line as *const ()) },  // Stdin.line! (index 1)
+        unsafe { core::mem::transmute(fns.stdin_line as *const ()) }, // Stdin.line! (index 1)
         unsafe { core::mem::transmute(fns.stdout_line as *const ()) }, // Stdout.line! (index 2)
     ]));
 
@@ -551,20 +533,13 @@ pub struct DefaultAllocators;
 
 impl DefaultAllocators {
     /// Allocate memory for the Roc runtime using the global allocator.
-    pub extern "C" fn roc_alloc(
-        _roc_ops: *mut RocOps,
-        length: usize,
-        alignment: usize,
-    ) -> *mut c_void {
+    pub extern "C" fn roc_alloc(_roc_ops: *mut RocOps, length: usize, alignment: usize) -> *mut c_void {
         unsafe {
             let min_alignment = alignment.max(core::mem::align_of::<usize>());
             let size_storage_bytes = min_alignment;
             let total_size = length + size_storage_bytes;
 
-            debug_assert!(
-                min_alignment.is_power_of_two(),
-                "alignment must be a power of two"
-            );
+            debug_assert!(min_alignment.is_power_of_two(), "alignment must be a power of two");
             let layout = Layout::from_size_align_unchecked(total_size, min_alignment);
             let base_ptr = std::alloc::alloc(layout);
             if base_ptr.is_null() {
@@ -573,9 +548,7 @@ impl DefaultAllocators {
             }
 
             // Store total size immediately before the user data pointer
-            let size_ptr = base_ptr
-                .add(size_storage_bytes)
-                .sub(core::mem::size_of::<usize>()) as *mut usize;
+            let size_ptr = base_ptr.add(size_storage_bytes).sub(core::mem::size_of::<usize>()) as *mut usize;
             *size_ptr = total_size;
 
             base_ptr.add(size_storage_bytes) as *mut c_void
@@ -592,38 +565,26 @@ impl DefaultAllocators {
             let total_size = *size_ptr;
 
             let base_ptr = (ptr as *mut u8).sub(size_storage_bytes);
-            debug_assert!(
-                min_alignment.is_power_of_two(),
-                "alignment must be a power of two"
-            );
+            debug_assert!(min_alignment.is_power_of_two(), "alignment must be a power of two");
             let layout = Layout::from_size_align_unchecked(total_size, min_alignment);
             std::alloc::dealloc(base_ptr, layout);
         }
     }
 
     /// Reallocate memory, potentially extending the existing allocation in-place.
-    pub extern "C" fn roc_realloc(
-        _roc_ops: *mut RocOps,
-        ptr: *mut c_void,
-        new_length: usize,
-        alignment: usize,
-    ) -> *mut c_void {
+    pub extern "C" fn roc_realloc(_roc_ops: *mut RocOps, ptr: *mut c_void, new_length: usize, alignment: usize) -> *mut c_void {
         unsafe {
             let min_alignment = alignment.max(core::mem::align_of::<usize>());
             let size_storage_bytes = min_alignment;
 
             // Read old size from metadata
-            let old_size_ptr =
-                (ptr as *const u8).sub(core::mem::size_of::<usize>()) as *const usize;
+            let old_size_ptr = (ptr as *const u8).sub(core::mem::size_of::<usize>()) as *const usize;
             let old_total_size = *old_size_ptr;
             let old_base_ptr = (ptr as *mut u8).sub(size_storage_bytes);
 
             // Realloc (may extend in-place without copying)
             let new_total_size = new_length + size_storage_bytes;
-            debug_assert!(
-                min_alignment.is_power_of_two(),
-                "alignment must be a power of two"
-            );
+            debug_assert!(min_alignment.is_power_of_two(), "alignment must be a power of two");
             let old_layout = Layout::from_size_align_unchecked(old_total_size, min_alignment);
             let new_base_ptr = std::alloc::realloc(old_base_ptr, old_layout, new_total_size);
             if new_base_ptr.is_null() {

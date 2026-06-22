@@ -281,7 +281,7 @@ write_native_target_platform_main() {
   awk -v target="$native_target" -v inputs="$target_inputs" '
     /^    targets: \{/ {
       print "    targets: {"
-      print "        inputs: \"targets/\","
+      print "        inputs_dir: \"targets/\","
       print "        " target ": { inputs: [" inputs "] },"
       print "    }"
       skip = 1
