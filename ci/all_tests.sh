@@ -334,7 +334,7 @@ copy_examples_for_package_url() {
 
   mkdir -p "$dest_dir"
   for example in ./examples/*.roc; do
-    sed "s|platform \"../platform/main.roc\"|platform \"$package_url\"|g" "$example" > "$dest_dir/$(basename "$example")"
+    sed -E "s|platform \"[^\"]+\"|platform \"$package_url\"|g" "$example" > "$dest_dir/$(basename "$example")"
   done
 }
 

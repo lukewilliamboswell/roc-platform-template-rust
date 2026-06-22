@@ -9,6 +9,12 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 
 ## Examples
 
+The checked-in examples use the latest released platform bundle:
+
+```roc
+platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/0.4/3q9Kou2yUcPovfn1NhRrsvtcdfHUWmzyCaGwiupYFXUk.tar.zst"
+```
+
 Run examples with interpreter: `roc examples/<name>.roc`
 
 Build standalone executable: `roc build examples/<name>.roc`
@@ -49,7 +55,7 @@ bash ci/all_tests.sh
 
 This builds the platform and runs all examples. If `roc` is already on your PATH at the pinned commit, it will be used directly; otherwise it will be built from source.
 
-The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use the package URL, and runs the examples again against the bundled package.
+The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use that package URL, and runs the examples again against the bundled package.
 
 Useful focused runs:
 
@@ -58,7 +64,7 @@ Useful focused runs:
 RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
 
 # Test only a package URL
-RUN_LOCAL_TESTS=0 PACKAGE_URL="http://localhost:8000/<bundle>.tar.zst" bash ci/all_tests.sh
+RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/0.4/3q9Kou2yUcPovfn1NhRrsvtcdfHUWmzyCaGwiupYFXUk.tar.zst" bash ci/all_tests.sh
 ```
 
 ## Supported Targets
