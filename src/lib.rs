@@ -15,6 +15,63 @@ use crate::roc_platform_abi::{
     HostStdoutLineResultPayload, HostStdoutLineResultTag, RocHost, RocList, RocStr,
 };
 
+/// Flush generated instructions from the AArch64 caches.
+///
+/// TODO: Remove this compatibility symbol once Roc ships the upstream fix.
+/// Tracking: https://github.com/lukewilliamboswell/roc-platform-template-rust/issues/11
+/// Upstream: https://github.com/roc-lang/roc/issues/11161
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[no_mangle]
+pub unsafe extern "C" fn __clear_cache(begin: *mut c_void, end: *mut c_void) {
+    use core::arch::asm;
+
+    let begin = begin as usize;
+    let end = end as usize;
+    let cache_type: usize;
+
+    asm!(
+        "mrs {cache_type}, ctr_el0",
+        cache_type = out(reg) cache_type,
+        options(nomem, nostack, preserves_flags),
+    );
+
+    // IDC means instruction-to-data cache coherency does not require explicit
+    // data-cache cleaning to the point of unification.
+    if cache_type & (1 << 28) == 0 {
+        let data_cache_line_size = 4 << ((cache_type >> 16) & 0xf);
+        let mut address = begin & !(data_cache_line_size - 1);
+
+        while address < end {
+            asm!(
+                "dc cvau, {address}",
+                address = in(reg) address,
+                options(nostack, preserves_flags),
+            );
+            address += data_cache_line_size;
+        }
+    }
+
+    asm!("dsb ish", options(nostack, preserves_flags));
+
+    // DIC means data-to-instruction cache coherency does not require explicit
+    // instruction-cache invalidation to the point of unification.
+    if cache_type & (1 << 29) == 0 {
+        let instruction_cache_line_size = 4 << (cache_type & 0xf);
+        let mut address = begin & !(instruction_cache_line_size - 1);
+
+        while address < end {
+            asm!(
+                "ic ivau, {address}",
+                address = in(reg) address,
+                options(nostack, preserves_flags),
+            );
+            address += instruction_cache_line_size;
+        }
+    }
+
+    asm!("dsb ish", "isb", options(nostack, preserves_flags));
+}
+
 static mut ROC_HOST: *mut RocHost = core::ptr::null_mut();
 
 fn set_roc_host(roc_host: *mut RocHost) {

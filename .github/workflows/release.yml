@@ -3,9 +3,14 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      nightly_validation:
+        description: "Validate a nightly candidate without publishing or deploying"
+        type: boolean
+        required: false
+        default: false
       release_tag:
         description: 'Release tag (e.g., v0.1.0)'
-        required: true
+        required: false
         type: string
   pull_request:
 
@@ -13,6 +18,9 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build-and-bundle:
@@ -25,23 +33,35 @@ jobs:
         shell: bash
 
     steps:
+      - name: Require a version for publication
+        if: github.event_name == 'workflow_dispatch' && !inputs.nightly_validation
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.release_tag }}
+        run: test -n "$RELEASE_VERSION" || { echo "A release version is required for publication" >&2; exit 1; }
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Zig
-        uses: mlugg/setup-zig@v2
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
           version: 0.16.0
 
       - name: Install Rust with cross-compilation targets
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           targets: x86_64-apple-darwin,aarch64-apple-darwin,x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
+
+      - name: Read pinned Roc nightly
+        shell: bash
+        run: printf 'ROC_NIGHTLY_TAG=%s\n' "$(sed -n '1p' .roc-version)" >> "$GITHUB_ENV"
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
+          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
 
       - name: Build platform for all targets
         run: ./build.sh --all
@@ -68,7 +88,7 @@ jobs:
           echo "bundle_filename=$BUNDLE_FILENAME" >> "$GITHUB_OUTPUT"
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: platform-bundle
           path: ${{ steps.bundle.outputs.bundle_filename }}
@@ -92,23 +112,28 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Zig
-        uses: mlugg/setup-zig@v2
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
           version: 0.16.0
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+
+      - name: Read pinned Roc nightly
+        shell: bash
+        run: printf 'ROC_NIGHTLY_TAG=%s\n' "$(sed -n '1p' .roc-version)" >> "$GITHUB_ENV"
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
+          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
 
       - name: Download bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: platform-bundle
 
@@ -147,12 +172,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Read pinned Roc nightly
+        shell: bash
+        run: printf 'ROC_NIGHTLY_TAG=%s\n' "$(sed -n '1p' .roc-version)" >> "$GITHUB_ENV"
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
+          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
 
       - name: Generate docs
         run: |
@@ -160,8 +190,8 @@ jobs:
           touch generated-docs/.nojekyll
 
       - name: Upload docs artifact
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-pages-artifact@v3
+        if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: generated-docs
 
@@ -170,16 +200,16 @@ jobs:
     needs: [build-and-bundle, test-bundle]
     runs-on: ubuntu-24.04
     # Only run on manual trigger
-    if: github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Download bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: platform-bundle
 
@@ -208,7 +238,7 @@ jobs:
     name: Deploy Docs to GitHub Pages
     needs: [build-docs, create-release]
     runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
     permissions:
       pages: write
       id-token: write
@@ -219,4 +249,4 @@ jobs:
     steps:
       - name: Deploy docs
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

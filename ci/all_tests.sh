@@ -375,7 +375,12 @@ if [ "${RUN_LOCAL_TESTS:-1}" = "1" ]; then
   TEMP_DIRS+=("$temp_root")
 
   local_examples_dir="$temp_root/examples"
-  copy_examples_for_platform_ref "$(pwd)/platform/main.roc" "$local_examples_dir"
+  # Platform specifications are relative to the copied app, even when the
+  # examples live outside the checkout. Roc rejects absolute platform paths.
+  # Resolve symlinks on both sides before computing the relative path (macOS
+  # exposes its temporary directory through /var -> /private/var).
+  local_platform_ref=$(python3 -c 'import os, sys; print(os.path.relpath(os.path.realpath("platform/main.roc"), os.path.realpath(sys.argv[1])))' "$local_examples_dir")
+  copy_examples_for_platform_ref "$local_platform_ref" "$local_examples_dir"
   run_suite "$local_examples_dir" "$local_examples_dir" "local platform"
 else
   echo ""
