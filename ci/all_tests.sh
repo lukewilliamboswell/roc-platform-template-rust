@@ -377,7 +377,9 @@ if [ "${RUN_LOCAL_TESTS:-1}" = "1" ]; then
   local_examples_dir="$temp_root/examples"
   # Platform specifications are relative to the copied app, even when the
   # examples live outside the checkout. Roc rejects absolute platform paths.
-  local_platform_ref=$(python3 -c 'import os, sys; print(os.path.relpath("platform/main.roc", sys.argv[1]))' "$local_examples_dir")
+  # Resolve symlinks on both sides before computing the relative path (macOS
+  # exposes its temporary directory through /var -> /private/var).
+  local_platform_ref=$(python3 -c 'import os, sys; print(os.path.relpath(os.path.realpath("platform/main.roc"), os.path.realpath(sys.argv[1])))' "$local_examples_dir")
   copy_examples_for_platform_ref "$local_platform_ref" "$local_examples_dir"
   run_suite "$local_examples_dir" "$local_examples_dir" "local platform"
 else
