@@ -2,6 +2,11 @@ name: Nightly configuration
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      nightly_validation:
+        description: Validate a nightly candidate
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:

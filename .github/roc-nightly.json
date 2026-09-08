@@ -1,7 +1,9 @@
 {
   "workflows": [
     "ci.yml",
-    "release.yml"
+    "release.yml",
+    "runtime-release.yml",
+    "nightly-controller-tests.yml"
   ],
   "compiler_roots": [
     "platform/main.roc",

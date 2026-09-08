@@ -37,7 +37,10 @@ def publication_context():
 
 
 def request():
-    version = os.environ.get('VERSION') or '0.0.0'
+    version = os.environ.get('VERSION')
+    if os.environ.get('PUBLISH') == 'true' and not version:
+        raise ValueError('Publication requires an explicit runtime version')
+    version = version or '0.0.0'
     tag = release_tag(version)
     if os.environ.get('PUBLISH') == 'true':
         # Validate the same context before spending time building a release.
