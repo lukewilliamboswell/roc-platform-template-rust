@@ -41,6 +41,26 @@ build_platform() {
 
 FAILED=0
 
+run_program() {
+  local source=$1
+  shift
+  if [ "$RUN_MODE" = compiled ]; then
+    "$(dirname "$source")/app" "$@"
+  else
+    local status=0 diagnostics
+    diagnostics=$(mktemp)
+    roc --no-cache "$source" "$@" 2> "$diagnostics" || status=$?
+    cat "$diagnostics" >&2
+    # Roc finishes successful runs with status 2 when it reports warnings.
+    # Every example is also executed as a binary, preserving application exits.
+    if [ "$status" = 2 ] && grep -qE '0 errors and [1-9][0-9]* warnings?' "$diagnostics"; then
+      status=0
+    fi
+    rm -f "$diagnostics"
+    return "$status"
+  fi
+}
+
 run_examples() {
   local examples_dir=$1
   local label=$2
@@ -54,8 +74,10 @@ run_examples() {
     echo ""
     echo "--- Testing: $BASENAME ---"
 
-    roc check "$ROC_FILE" || FAILED=1
-    # The dbg example intentionally warns in optimized builds (exit status 2).
+    local check_status=0
+    roc check "$ROC_FILE" || check_status=$?
+    if [[ $check_status -ne 0 && $check_status -ne 2 ]]; then FAILED=1; fi
+    # Roc uses status 2 for warnings, including released dependency pin mismatches.
     local build_status=0
     roc build "$ROC_FILE" --output="$(dirname "$ROC_FILE")/app" || build_status=$?
     if [[ $build_status -ne 0 && $build_status -ne 2 ]] || [ ! -f "$(dirname "$ROC_FILE")/app" ]; then
@@ -63,72 +85,75 @@ run_examples() {
       FAILED=1
     fi
 
-    # Run with --no-cache to ensure fresh builds
-    set +e
-    case "$BASENAME" in
-      "echo")
-        OUTPUT=$(printf 'bundled input\n' | roc --no-cache "$ROC_FILE" 2>&1)
-        EXIT_CODE=$?
-        if [[ $EXIT_CODE -eq 0 && "$OUTPUT" == *"You entered: bundled input"* ]]; then
-          echo "PASS: echo.roc"
-          echo "$OUTPUT"
-        else
-          echo "FAIL: echo.roc (exit code: $EXIT_CODE)"
-          echo "$OUTPUT"
-          FAILED=1
-        fi
-        ;;
-      "echo_multiline")
-        OUTPUT=$(printf 'first line\nsecond line\n' | roc --no-cache "$ROC_FILE" 2>&1)
-        EXIT_CODE=$?
-        if [[ $EXIT_CODE -eq 0 && "$OUTPUT" == *"first line"* && "$OUTPUT" == *"second line"* ]]; then
-          echo "PASS: echo_multiline.roc"
-          echo "$OUTPUT"
-        else
-          echo "FAIL: echo_multiline.roc (exit code: $EXIT_CODE)"
-          echo "$OUTPUT"
-          FAILED=1
-        fi
-        ;;
-      "exit")
-        # exit.roc should exit with code 23
-        roc --no-cache "$ROC_FILE"
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -eq 23 ]; then
-          echo "PASS: exit.roc returned expected exit code 23"
-        else
-          echo "FAIL: exit.roc returned $EXIT_CODE, expected 23"
-          FAILED=1
-        fi
-        ;;
-      "cli_args")
-        # cli_args.roc - just check it runs successfully (args are passed by runtime)
-        OUTPUT=$(roc --no-cache "$ROC_FILE" 2>&1)
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -eq 0 ]; then
-          echo "PASS: cli_args.roc"
-          echo "$OUTPUT"
-        else
-          echo "FAIL: cli_args.roc (exit code: $EXIT_CODE)"
-          echo "$OUTPUT"
-          FAILED=1
-        fi
-        ;;
-      *)
-        # Regular examples should exit with 0
-        OUTPUT=$(roc --no-cache "$ROC_FILE" 2>&1)
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -eq 0 ]; then
-          echo "PASS: $BASENAME.roc"
-          echo "$OUTPUT"
-        else
-          echo "FAIL: $BASENAME.roc (exit code: $EXIT_CODE)"
-          echo "$OUTPUT"
-          FAILED=1
-        fi
-        ;;
-    esac
-    set -e
+    local RUN_MODE
+    for RUN_MODE in roc compiled; do
+      echo "Running $BASENAME ($RUN_MODE)..."
+      set +e
+      case "$BASENAME" in
+        "echo")
+          OUTPUT=$(printf 'bundled input\n' | run_program "$ROC_FILE" 2>&1)
+          EXIT_CODE=$?
+          if [[ $EXIT_CODE -eq 0 && "$OUTPUT" == *"You entered: bundled input"* ]]; then
+            echo "PASS: echo.roc"
+            echo "$OUTPUT"
+          else
+            echo "FAIL: echo.roc (exit code: $EXIT_CODE)"
+            echo "$OUTPUT"
+            FAILED=1
+          fi
+          ;;
+        "echo_multiline")
+          OUTPUT=$(printf 'first line\nsecond line\n' | run_program "$ROC_FILE" 2>&1)
+          EXIT_CODE=$?
+          if [[ $EXIT_CODE -eq 0 && "$OUTPUT" == *"first line"* && "$OUTPUT" == *"second line"* ]]; then
+            echo "PASS: echo_multiline.roc"
+            echo "$OUTPUT"
+          else
+            echo "FAIL: echo_multiline.roc (exit code: $EXIT_CODE)"
+            echo "$OUTPUT"
+            FAILED=1
+          fi
+          ;;
+        "exit")
+          # exit.roc should exit with code 23
+          run_program "$ROC_FILE"
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 23 ]; then
+            echo "PASS: exit.roc returned expected exit code 23"
+          else
+            echo "FAIL: exit.roc returned $EXIT_CODE, expected 23"
+            FAILED=1
+          fi
+          ;;
+        "cli_args")
+          # cli_args.roc - just check it runs successfully (args are passed by runtime)
+          OUTPUT=$(run_program "$ROC_FILE" 2>&1)
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "PASS: cli_args.roc"
+            echo "$OUTPUT"
+          else
+            echo "FAIL: cli_args.roc (exit code: $EXIT_CODE)"
+            echo "$OUTPUT"
+            FAILED=1
+          fi
+          ;;
+        *)
+          # Regular examples should exit with 0
+          OUTPUT=$(run_program "$ROC_FILE" 2>&1)
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "PASS: $BASENAME.roc"
+            echo "$OUTPUT"
+          else
+            echo "FAIL: $BASENAME.roc (exit code: $EXIT_CODE)"
+            echo "$OUTPUT"
+            FAILED=1
+          fi
+          ;;
+      esac
+      set -e
+    done
   done
 }
 
@@ -147,7 +172,7 @@ run_roc_tests() {
       test_exit_code=$?
       set -e
 
-      # Exit codes: 0 = all pass, 2 = some tests skipped, other = failure
+      # Exit codes: 0 = all pass, 2 = warnings/skipped tests, other = failure
       if [[ $test_exit_code -ne 0 && $test_exit_code -ne 2 ]]; then
         echo "FAIL: roc test $file (exit code: $test_exit_code)"
         FAILED=1
