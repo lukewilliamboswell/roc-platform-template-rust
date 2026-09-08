@@ -15,10 +15,12 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 
 ## Examples
 
-The examples use the immutable [1.0.0 release](https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/tag/1.0.0). Install the compiler declared in the example header first:
+Download the [complete example starter](https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/examples-1.1.0.tar.gz) or the [versioned API documentation](https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/api-docs-1.1.0.tar).
+
+The examples use the immutable [1.1.0 release](https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/tag/1.1.0). Install the compiler declared in the example header first:
 
 ```roc
-app [main!] { roc: "nightly-2026-09-05-b195f5b", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.0.0/Bu7FVf57VbTwUrUSumuTmQNMJLLmGBmer6L5AarS4qnV.tar.zst" }
+app [main!] { roc: "nightly-2026-09-05-b195f5b", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" }
 ```
 
 Run an example directly: `roc examples/hello_world/main.roc`.
@@ -85,7 +87,7 @@ RUN_PUBLIC_TESTS=1 RUN_LOCAL_TESTS=0 RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
 RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
 
 # Test only a package URL
-RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.0.0/Bu7FVf57VbTwUrUSumuTmQNMJLLmGBmer6L5AarS4qnV.tar.zst" bash ci/all_tests.sh
+RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" bash ci/all_tests.sh
 ```
 
 ## Supported Targets
