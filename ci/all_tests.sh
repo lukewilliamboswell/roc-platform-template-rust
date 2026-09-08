@@ -18,8 +18,9 @@ cleanup() {
   done
 }
 
-trap 'cleanup; exit 130' INT
-trap 'cleanup; exit 143' TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if ! command -v roc >/dev/null 2>&1; then
   echo "Error: roc not found in PATH. Install Roc or add it to PATH before running ci/all_tests.sh." >&2
@@ -30,6 +31,14 @@ echo "=== Roc Platform Template (Rust) CI ==="
 echo ""
 echo "Using $(roc version)"
 
+build_platform() {
+  if [ -n "${RUNTIME_CANDIDATE:-}" ]; then
+    ./build.sh --runtime-candidate "$RUNTIME_CANDIDATE"
+  else
+    ./build.sh
+  fi
+}
+
 FAILED=0
 
 run_examples() {
@@ -39,11 +48,20 @@ run_examples() {
   echo ""
   echo "=== Running examples ($label) ==="
 
-  for ROC_FILE in "$examples_dir"/*.roc; do
+  for ROC_FILE in "$examples_dir"/*/main.roc; do
     local BASENAME
-    BASENAME=$(basename "$ROC_FILE" .roc)
+    BASENAME=$(basename "$(dirname "$ROC_FILE")")
     echo ""
     echo "--- Testing: $BASENAME ---"
+
+    roc check "$ROC_FILE" || FAILED=1
+    # The dbg example intentionally warns in optimized builds (exit status 2).
+    local build_status=0
+    roc build "$ROC_FILE" --output="$(dirname "$ROC_FILE")/app" || build_status=$?
+    if [[ $build_status -ne 0 && $build_status -ne 2 ]] || [ ! -f "$(dirname "$ROC_FILE")/app" ]; then
+      echo "FAIL: building $BASENAME (exit code: $build_status)"
+      FAILED=1
+    fi
 
     # Run with --no-cache to ensure fresh builds
     set +e
@@ -177,7 +195,7 @@ target_inputs_for_roc() {
       echo '"libhost.a", app'
       ;;
     x64musl|arm64musl)
-      echo '"crt1.o", "libhost.a", "libunwind.a", app, "libc.a"'
+      echo '"crt1.o", "libhost.a", "libunwind.a", app, "libc.a", "libzigc.a", "libcompiler_rt.a"'
       ;;
     *)
       echo "Unknown target: $1" >&2
@@ -202,6 +220,8 @@ copy_native_target_files() {
       cp "platform/targets/$native_target/libhost.a" "$target_dir/"
       cp "platform/targets/$native_target/libunwind.a" "$target_dir/"
       cp "platform/targets/$native_target/libc.a" "$target_dir/"
+      cp "platform/targets/$native_target/libzigc.a" "$target_dir/"
+      cp "platform/targets/$native_target/libcompiler_rt.a" "$target_dir/"
       ;;
     *)
       echo "Unknown target: $native_target" >&2
@@ -217,7 +237,7 @@ write_native_target_platform_main() {
   target_inputs=$(target_inputs_for_roc "$native_target")
 
   awk -v target="$native_target" -v inputs="$target_inputs" '
-    /^    targets: \{/ {
+    /^[[:space:]]+targets: \{/ {
       print "    targets: {"
       print "        inputs_dir: \"targets/\","
       print "        " target ": { inputs: [" inputs "] },"
@@ -225,7 +245,7 @@ write_native_target_platform_main() {
       skip = 1
       next
     }
-    skip && /^    }$/ {
+    skip && /^[[:space:]]+}$/ {
       skip = 0
       next
     }
@@ -240,7 +260,7 @@ create_native_bundle() {
 
   if [ ! -f "platform/targets/$native_target/libhost.a" ]; then
     echo "Native host archive missing for $native_target; building it first..."
-    ./build.sh
+    build_platform
   fi
 
   local platform_dir="$temp_root/platform"
@@ -250,6 +270,7 @@ create_native_bundle() {
   cp platform/Host.roc "$platform_dir/"
   cp platform/Stdin.roc "$platform_dir/"
   cp platform/Stdout.roc "$platform_dir/"
+  if [ -d platform/runtime ]; then cp -R platform/runtime "$platform_dir/"; fi
   write_native_target_platform_main "$native_target" "$platform_dir/main.roc"
   copy_native_target_files "$native_target" "$platform_dir"
 
@@ -263,7 +284,11 @@ create_native_bundle() {
         lib_files+=("$lib")
       fi
     done
-    roc bundle "${roc_files[@]}" "${lib_files[@]}" --output-dir "$temp_root"
+    metadata=()
+    if [ -d runtime ]; then
+      while IFS= read -r file; do metadata+=("$file"); done < <(find runtime -type f | sort)
+    fi
+    roc bundle "${roc_files[@]}" "${lib_files[@]}" "${metadata[@]}" --output-dir "$temp_root"
   )
 }
 
@@ -276,8 +301,10 @@ copy_examples_for_platform_ref() {
   escaped_ref=${escaped_ref//|/\\|}
 
   mkdir -p "$dest_dir"
-  for example in ./examples/*.roc; do
-    sed -E "s|platform \"[^\"]+\"|platform \"$escaped_ref\"|g" "$example" > "$dest_dir/$(basename "$example")"
+  cp -R ./examples/. "$dest_dir/"
+  for example in "$dest_dir"/*/main.roc; do
+    sed -E "s|platform \"[^\"]+\"|platform \"$escaped_ref\"|g" "$example" > "$example.tmp"
+    mv "$example.tmp" "$example"
   done
 }
 
@@ -357,12 +384,23 @@ run_bundle_suite() {
   run_suite "$package_examples_dir" "$package_examples_dir" "bundled package"
 }
 
+if [ "${RUN_PUBLIC_TESTS:-0}" = "1" ]; then
+  public_root=$(mktemp -d "${TMPDIR:-/tmp}/platform-template-public.XXXXXX")
+  TEMP_DIRS+=("$public_root")
+  mkdir -p "$public_root/examples"
+  cp -R examples/. "$public_root/examples/"
+  # Preserve complete applications and their exact committed headers.
+  export ROC_CACHE_DIR="$public_root/roc-cache"
+  export XDG_CACHE_HOME="$public_root/xdg-cache"
+  run_suite "$public_root/examples" "$public_root/examples" "published examples"
+fi
+
 if [ "${RUN_LOCAL_TESTS:-1}" = "1" ]; then
   # Build the platform (skip if SKIP_BUILD is set, used when testing bundled platform)
   if [ "${SKIP_BUILD:-}" != "1" ]; then
     echo ""
     echo "=== Building platform ==="
-    ./build.sh
+    build_platform
   else
     echo ""
     echo "=== Skipping platform build (SKIP_BUILD=1) ==="
@@ -380,7 +418,7 @@ if [ "${RUN_LOCAL_TESTS:-1}" = "1" ]; then
   # Resolve symlinks on both sides before computing the relative path (macOS
   # exposes its temporary directory through /var -> /private/var).
   local_platform_ref=$(python3 -c 'import os, sys; print(os.path.relpath(os.path.realpath("platform/main.roc"), os.path.realpath(sys.argv[1])))' "$local_examples_dir")
-  copy_examples_for_platform_ref "$local_platform_ref" "$local_examples_dir"
+  copy_examples_for_platform_ref "../$local_platform_ref" "$local_examples_dir"
   run_suite "$local_examples_dir" "$local_examples_dir" "local platform"
 else
   echo ""
@@ -401,10 +439,8 @@ fi
 
 echo ""
 if [ $FAILED -eq 0 ]; then
-    cleanup
     echo "=== All tests passed! ==="
 else
-    cleanup
     echo "=== Some tests failed ==="
     exit 1
 fi

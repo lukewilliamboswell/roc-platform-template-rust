@@ -1,13 +1,13 @@
-app [main!] { pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.0.0/Bu7FVf57VbTwUrUSumuTmQNMJLLmGBmer6L5AarS4qnV.tar.zst" }
+app [main!] { roc: "nightly-2026-09-05-b195f5b", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.0.0/Bu7FVf57VbTwUrUSumuTmQNMJLLmGBmer6L5AarS4qnV.tar.zst" }
 
 import pf.Stdout
 
 # Demonstrates: expect keyword for testing
-# Run with: roc test examples/tests.roc
+# Run with: roc test examples/tests/main.roc
 
 main! : List(Str) => Try({}, [Exit(I32), StdoutErr(Str), ..])
 main! = |_args| {
-	Stdout.line!("Run 'roc test --verbose examples/tests.roc' to execute the tests")?
+	Stdout.line!("Run 'roc test --verbose examples/tests/main.roc' to execute the tests")?
 	Ok({})
 }
 

@@ -78,8 +78,29 @@ build_target_native() {
     echo "  -> platform/targets/$target_name/libhost.a"
 }
 
+# Download and verify the independently released runtime before building hosts.
+# An unpublished archive is accepted only with this explicit development flag.
+BUILD_ALL=0
+RUNTIME_CANDIDATE_PATH=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --all) BUILD_ALL=1; shift ;;
+        --runtime-candidate)
+            test "$#" -ge 2 || { echo "--runtime-candidate requires an archive" >&2; exit 1; }
+            RUNTIME_CANDIDATE_PATH=$2; shift 2 ;;
+        *) echo "Unknown build argument: $1" >&2; exit 1 ;;
+    esac
+done
+if [ "$BUILD_ALL" = 1 ] || [[ "$(detect_native_target)" == *musl ]]; then
+    if [ -n "$RUNTIME_CANDIDATE_PATH" ]; then
+        python3 ci/runtime.py install-candidate "$RUNTIME_CANDIDATE_PATH"
+    else
+        python3 ci/runtime.py fetch
+    fi
+fi
+
 # Main logic
-if [ "${1:-}" = "--all" ]; then
+if [ "$BUILD_ALL" = 1 ]; then
     echo "Building for all targets..."
     echo ""
 
