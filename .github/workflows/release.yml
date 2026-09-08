@@ -140,7 +140,7 @@ jobs:
       - name: Start HTTP server for bundle
         run: |
           # Start Python HTTP server in background on port 8000
-          python3 -m http.server 8000 &
+          python3 -m http.server 8000 > "$RUNNER_TEMP/bundle-http.log" 2>&1 < /dev/null &
           HTTP_SERVER_PID=$!
           echo "HTTP_SERVER_PID=$HTTP_SERVER_PID" >> "$GITHUB_ENV"
 
@@ -148,7 +148,7 @@ jobs:
           sleep 5
 
           # Verify server is running and bundle is accessible
-          if ! curl -f -I "http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}" > /dev/null 2>&1; then
+          if ! curl --max-time 10 -f -I "http://localhost:8000/${{ needs.build-and-bundle.outputs.bundle_filename }}" > /dev/null 2>&1; then
             echo "Error: HTTP server not accessible or bundle not found"
             kill $HTTP_SERVER_PID || true
             exit 1
