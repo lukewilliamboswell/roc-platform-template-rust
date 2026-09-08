@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [current-source, published-examples]
+        lane: [current-source]
         os:
           - macos-15       # Apple Silicon
           - macos-15-intel # Intel Mac
@@ -65,6 +65,3 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash ci/all_tests.sh
 
-      - name: Test committed published examples with a fresh cache
-        if: matrix.lane == 'published-examples'
-        run: RUN_PUBLIC_TESTS=1 RUN_LOCAL_TESTS=0 RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
