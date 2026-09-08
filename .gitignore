@@ -39,3 +39,7 @@ Cargo.lock
 
 # Claude Code
 .claude
+
+# Runtime producer output
+dist/
+__pycache__/
