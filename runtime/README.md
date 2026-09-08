@@ -43,7 +43,7 @@ Requires Linux x86_64 and Python 3.12 or newer. The builder downloads and verifi
 its own pinned Zig toolchain. It never copies the old repository binaries.
 
 ```sh
-python3 -m unittest discover -s ci -p test_runtime.py -v
+python3 -m unittest discover -s ci -p 'test_runtime*.py' -v
 python3 ci/runtime.py build
 ./dist/runtime/smoke-x64musl
 ```
@@ -73,8 +73,8 @@ host does not rebuild or advance this runtime dependency.
    version and `publish: true`.
 3. The separate publication job downloads the tested artifact from that run,
    creates GitHub/Sigstore build-provenance and SPDX SBOM attestations, and releases
-   the tar, checksums, SBOM, attestation bundles and proposed consumer lock. It does
-   not execute repository scripts or rebuilt binaries with signing authority.
+   the tar, checksums, SBOM, attestation bundles and proposed consumer lock. It loads only release helpers from the exact trusted `main` commit; it never
+   executes build tools, downloaded scripts or smoke binaries with signing authority.
 4. Verify the published bytes and attestations (the workflow performs this too).
    Review and copy `runtime-lock.proposed.json` into `runtime/lock.json` in an
    adoption PR. Verify the tag, SHA-256, and source commit against the successful
@@ -119,3 +119,8 @@ it does not certify dependency safety, reproducible compilation, OpenSSF badge
 compliance, or a particular SLSA level. Archive headers are normalized, but compiler
 outputs may retain build paths and no bit-for-bit reproducibility claim is made.
 Removing tracked binaries does not rewrite or shrink existing Git history.
+
+The workflow delegates orchestration to `ci/runtime_release.py` (`request`,
+`test`, `preflight`, `publish`, `verify`). Attestation policy is shared with the
+consumer in `ci/runtime.py`; GitHub job permissions and signing actions remain
+visible in the workflow.

@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - 'runtime/**'
-      - 'ci/runtime.py'
-      - 'ci/test_runtime.py'
+      - 'ci/runtime*.py'
+      - 'ci/test_runtime*.py'
       - '.github/workflows/runtime-release.yml'
   workflow_dispatch:
     inputs:
@@ -41,19 +41,9 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           PUBLISH: ${{ inputs.publish }}
-        run: |
-          python3 - <<'PY'
-          import os, re
-          version = os.environ['VERSION'] or '0.0.0'
-          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
-              raise SystemExit('Expected an unprefixed runtime SemVer')
-          if os.environ['PUBLISH'] == 'true' and os.environ['GITHUB_REF'] != 'refs/heads/main':
-              raise SystemExit('Runtime publication is restricted to main')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write('tag=runtime-v' + version + '\n')
-          PY
+        run: python3 ci/runtime_release.py request
       - name: Test archive verification boundaries
-        run: python3 -m unittest discover -s ci -p test_runtime.py -v
+        run: python3 -m unittest discover -s ci -p 'test_runtime*.py' -v
       - name: Build from the checksum-pinned Zig distribution
         env:
           RUNTIME_TAG: ${{ steps.version.outputs.tag }}
@@ -87,13 +77,7 @@ jobs:
           name: runtime-candidate
           path: dist/runtime
       - name: Verify archive and run native libc and unwinding smoke test
-        env:
-          TARGET: ${{ matrix.target }}
-        run: |
-          (cd dist/runtime && sha256sum --check SHA256SUMS)
-          python3 ci/runtime.py inspect dist/runtime/linux-runtime.tar.gz
-          chmod +x "dist/runtime/smoke-$TARGET"
-          "dist/runtime/smoke-$TARGET"
+        run: python3 ci/runtime_release.py test --target ${{ matrix.target }}
 
   publish:
     needs: [build, test]
@@ -104,25 +88,23 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    # This job consumes data artifacts only: it does not check out or execute
-    # project scripts, build tools, or smoke-test binaries with signing authority.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUNTIME_TAG: ${{ needs.build.outputs.tag }}
+    # Load release helpers from the exact trusted main commit, never from the
+    # downloaded artifact. No build tools or smoke binaries execute in this job.
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          sparse-checkout: ci
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: runtime-candidate
           path: dist/runtime
       - name: Reject an existing release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUNTIME_TAG: ${{ needs.build.outputs.tag }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RUNTIME_TAG" > tags.json
-          python3 - <<'PY'
-          import json, os
-          if any(t['ref'] == 'refs/tags/' + os.environ['RUNTIME_TAG'] for t in json.load(open('tags.json'))):
-              raise SystemExit('Runtime tag already exists; inspect partial publication before recovery')
-          PY
-          (cd dist/runtime && sha256sum --check SHA256SUMS)
+        run: python3 ci/runtime_release.py preflight
       - name: Attest build provenance
         id: provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -136,32 +118,8 @@ jobs:
           sbom-path: dist/runtime/runtime.spdx.json
       - name: Publish the tested archive and verification material
         env:
-          GH_TOKEN: ${{ github.token }}
-          RUNTIME_TAG: ${{ needs.build.outputs.tag }}
           PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
           SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
-        run: |
-          cp "$PROVENANCE_BUNDLE" dist/runtime/provenance.sigstore.json
-          cp "$SBOM_BUNDLE" dist/runtime/sbom.sigstore.json
-          printf 'Independent Linux runtime built from pinned Zig sources.\n\nSource commit: `%s`\n\nIncludes musl libc and startup objects, LLVM libunwind, licenses, an SPDX SBOM, and Sigstore attestation bundles.\n\nReview runtime-lock.proposed.json before adopting this release in platform builds.\n' "$GITHUB_SHA" > notes.md
-          gh release create "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" --title "Linux runtime $RUNTIME_TAG" --latest=false \
-            --notes-file notes.md \
-            dist/runtime/linux-runtime.tar.gz dist/runtime/SHA256SUMS \
-            dist/runtime/runtime.spdx.json dist/runtime/runtime-lock.proposed.json \
-            dist/runtime/provenance.sigstore.json dist/runtime/sbom.sigstore.json
+        run: python3 ci/runtime_release.py publish
       - name: Verify the published download and both attestations
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUNTIME_TAG: ${{ needs.build.outputs.tag }}
-        run: |
-          mkdir published
-          gh release download "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern linux-runtime.tar.gz --dir published
-          cmp dist/runtime/linux-runtime.tar.gz published/linux-runtime.tar.gz
-          for predicate in https://slsa.dev/provenance/v1 https://spdx.dev/Document; do
-            gh attestation verify published/linux-runtime.tar.gz --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/runtime-release.yml" \
-              --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
-              --deny-self-hosted-runners --predicate-type "$predicate"
-          done
+        run: python3 ci/runtime_release.py verify

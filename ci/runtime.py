@@ -223,6 +223,14 @@ def install(archive):
         dest.write_bytes(data)
 
 
+def verify_attestations(archive, source_commit):
+    for predicate in ("https://slsa.dev/provenance/v1", "https://spdx.dev/Document"):
+        command(["gh", "attestation", "verify", archive, "--repo", REPOSITORY,
+                 "--signer-workflow", f"{REPOSITORY}/{WORKFLOW}", "--source-ref", "refs/heads/main",
+                 "--source-digest", source_commit, "--deny-self-hosted-runners",
+                 "--predicate-type", predicate])
+
+
 def fetch():
     lock = read_json(ROOT / "runtime/lock.json")
     if not isinstance(lock.get("tag"), str) or not re.fullmatch(r"runtime-v[0-9]+\.[0-9]+\.[0-9]+", lock["tag"]):
@@ -233,11 +241,7 @@ def fetch():
         archive = Path(temp) / ARTIFACT
         download(f"https://github.com/{REPOSITORY}/releases/download/{lock['tag']}/{ARTIFACT}", archive)
         check_sha(archive, lock["sha256"])
-        for predicate in ("https://slsa.dev/provenance/v1", "https://spdx.dev/Document"):
-            command(["gh", "attestation", "verify", archive, "--repo", REPOSITORY,
-                     "--signer-workflow", f"{REPOSITORY}/{WORKFLOW}", "--source-ref", "refs/heads/main",
-                     "--source-digest", lock["source_commit"], "--deny-self-hosted-runners",
-                     "--predicate-type", predicate])
+        verify_attestations(archive, lock["source_commit"])
         install(archive)
 
 
