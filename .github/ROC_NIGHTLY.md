@@ -3,7 +3,7 @@
 This repository checks once daily at 13:34 UTC, about four hours
 after the upstream 09:00 UTC build. Late publication can wait until the next day.
 
-The `roc` fields in `platform/main.roc` and every `examples/*/main.roc` are the compiler pins. Selected headers must agree; `.roc-version` is removed. `.github/roc-nightly.json` selects this
+The `roc` fields in `platform/main.roc` and every `examples/*/main.roc` are the compiler pins. Selected headers must agree. `.github/roc-nightly.json` selects this
 repository's validation workflows, including their validation-only release paths.
 The controller, its tests, and job permissions are maintained in
 [roc-automation](https://github.com/lukewilliamboswell/roc-automation).
@@ -28,26 +28,19 @@ Use the shared [OpenSSF rollout checklist](https://github.com/lukewilliamboswell
 to record project-specific evidence. This integration does not establish badge
 compliance or change repository settings.
 
-## Rollout still required
+## Repository settings and live validation
 
-The [September 7 scheduled run](https://github.com/lukewilliamboswell/roc-platform-template-rust/actions/runs/34151297921)
-failed at PR creation, before validation. The repository API reports
-`can_approve_pull_request_reviews: false`, GitHub's combined “Allow GitHub Actions
-to create and approve pull requests” setting. It was enabled on September 8,
-2026 and read back as `true`, with default workflow permissions still `read`.
-The controller never approves PRs; `auto_merge` remains `false`.
+GitHub Actions may create pull requests; default workflow permissions remain
+read-only. The controller never approves PRs, and `auto_merge` remains `false`.
+Main requires current-commit CI checks and forbids force pushes and deletion,
+including for administrators. Independent approval is not required for this
+single-maintainer repository.
 
-No repository rulesets were configured when inspected. Configure the intended
-review policy and require current-commit checks before enabling automatic merging.
-Verify the controller's reported statuses against a real candidate and effective
-repository rules; a green dispatch alone does not prove protected merging works.
-
-After merging, dispatch Update Roc nightly on current `main`. Verify a signed
-header-only candidate, published-example and current-source jobs on all four
-targets, archive tests, and skipped publication/deployment jobs. Record successful,
-failed, and no-op run links in the rollout PR. Local tests do not establish live
-rollout. Let the controller reconcile the reserved bot branch; keep source fixes
-on separate reviewed branches.
+Dispatch Update Roc nightly on `main` to validate a candidate. Check that its
+signed commit changes only compiler headers, that published-example, current-source,
+and archive tests pass on all four targets, and that publication/deployment jobs
+are skipped. Let the controller reconcile its reserved bot branch; keep source
+fixes on separate branches.
 
 `ci/compiler_pins.py` is vendored from the shared revision above under UPL-1.0.
 Update it deliberately with the shared workflows. `ci/compiler_version.py`
@@ -57,10 +50,3 @@ Manual release follow-up: test the actual new URL from a fresh cache, prepare
 complete pinned starters, and open a signed PR updating public URLs and release
 links. Validate that PR's current SHA. Versioned documentation and starter assets
 are not yet automated; the existing Pages deployment replaces the current docs.
-
-Local validation on September 8, 2026, using `nightly-2026-09-05-b195f5b`:
-all 12 examples checked, built, and ran against committed release URLs, current
-source, and a native Linux x86_64 bundle. Both expect-bearing applications passed
-(10 expectations per lane). The public lane used a fresh cache. Actionlint,
-Bash syntax validation, and the shared configuration check passed. The other
-three target platforms and a live nightly dispatch remain unverified.
