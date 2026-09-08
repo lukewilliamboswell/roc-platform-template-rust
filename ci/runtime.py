@@ -61,6 +61,36 @@ def command(args, **kwargs):
     subprocess.run([str(arg) for arg in args], check=True, **kwargs)
 
 
+def install_zig(work, toolchain, version):
+    archive = work / "zig.tar.xz"
+    download(toolchain["url"], archive)
+    check_sha(archive, toolchain["sha256"])
+    with tarfile.open(archive) as tar:
+        tar.extractall(work, filter="data")
+    zig = work / toolchain["directory"] / "zig"
+    actual = subprocess.check_output([zig, "version"], text=True).strip()
+    if actual != version:
+        raise ValueError("Downloaded Zig version differs from source pin")
+    return zig
+
+
+def zig_env(cache):
+    env = {key: value for key, value in os.environ.items() if not key.startswith("ZIG_")}
+    env.update(ZIG_GLOBAL_CACHE_DIR=str(cache), ZIG_LOCAL_CACHE_DIR=str(cache / "local"))
+    return env
+
+
+def link_smoke(zig, libraries, target, output, env):
+    """Link only the supplied runtime files, never implicit Zig runtime libraries."""
+    triple = TARGETS[target]
+    obj = output.with_suffix(".o")
+    command([zig, "cc", "-target", triple, "-mcpu=baseline", "-O2", "-funwind-tables",
+             "-c", ROOT / "runtime/smoke.c", "-o", obj], env=env)
+    command([zig, "cc", "-target", triple, "-static", "-nostdlib", libraries / "crt1.o",
+             obj, libraries / "libunwind.a", libraries / "libc.a", libraries / "libzigc.a",
+             libraries / "libcompiler_rt.a", "-o", output], env=env)
+
+
 def build(output):
     """Zig compiles its vendored C/assembly sources into a fresh cache per target."""
     source = read_json(ROOT / "runtime/source.json")
@@ -68,27 +98,13 @@ def build(output):
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="runtime-build-") as temporary:
         work = Path(temporary)
-        archive = work / "zig.tar.xz"
-        download(source["url"], archive)
-        check_sha(archive, source["sha256"])
-        # Only extract the digest-verified official toolchain, using data filtering.
-        with tarfile.open(archive) as tar:
-            tar.extractall(work, filter="data")
-        zig_root = work / f"zig-x86_64-linux-{source['zig_version']}"
-        zig = zig_root / "zig"
-        actual = subprocess.check_output([zig, "version"], text=True).strip()
-        if actual != source["zig_version"]:
-            raise ValueError("Downloaded Zig version differs from source pin")
+        zig = install_zig(work, source | {"directory": f"zig-x86_64-linux-{source['zig_version']}"}, source["zig_version"])
+        zig_root = zig.parent
         stage = work / "stage"
         stage.mkdir()
         for target, triple in TARGETS.items():
             cache = work / f"cache-{target}"
-            env = os.environ.copy()
-            # Do not let developer or runner cache/lib overrides supply runtime files.
-            for key in list(env):
-                if key.startswith("ZIG_"):
-                    del env[key]
-            env.update(ZIG_GLOBAL_CACHE_DIR=str(cache), ZIG_LOCAL_CACHE_DIR=str(cache / "local"))
+            env = zig_env(cache)
             log = output / f"build-{target}.log"
             with log.open("w") as handle:
                 command([zig, "cc", "-target", triple, "-mcpu=baseline", "-static", "-O2",
@@ -107,15 +123,6 @@ def build(output):
                 dest = stage / "targets" / target / name
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(matches[0], dest)
-            # Link the smoke test with exactly the selected runtime, without Zig's
-            # implicit libc, crt or unwind libraries. Run it on each native CI host.
-            obj = work / f"smoke-{target}.o"
-            command([zig, "cc", "-target", triple, "-mcpu=baseline", "-O2", "-funwind-tables",
-                     "-c", ROOT / "runtime/smoke.c", "-o", obj], env=env)
-            libs = stage / "targets" / target
-            command([zig, "cc", "-target", triple, "-static", "-nostdlib", libs / "crt1.o",
-                     obj, libs / "libunwind.a", libs / "libc.a", libs / "libzigc.a",
-                     libs / "libcompiler_rt.a", "-o", output / f"smoke-{target}"], env=env)
         licenses = stage / "licenses"
         licenses.mkdir()
         for dest, src in {"musl.txt": "lib/libc/musl/COPYRIGHT",
@@ -135,7 +142,7 @@ def build(output):
                     info.mode = 0o644
                     tar.addfile(info, io.BytesIO(data))
         inspect(output / ARTIFACT)
-        sbom(output, manifest)
+        write_json(output / "runtime.spdx.json", sbom_document(manifest, digest((output / ARTIFACT).read_bytes())))
         sha = digest((output / ARTIFACT).read_bytes())
         (output / "SHA256SUMS").write_text(f"{sha}  {ARTIFACT}\n")
         write_json(output / "runtime-lock.proposed.json", {
@@ -144,10 +151,9 @@ def build(output):
         print(f"Built {output / ARTIFACT}: {sha}")
 
 
-def sbom(output, manifest):
+def sbom_document(manifest, archive_sha, created=None):
     """An explicit SPDX inventory; no guessed upstream versions from stripped archives."""
     source = manifest["source"]
-    archive_sha = digest((output / ARTIFACT).read_bytes())
     packages = []
     for name, license_id in [("musl", "MIT"), ("libunwind", "Apache-2.0 WITH LLVM-exception"), ("zig-runtime", "MIT")]:
         packages.append({"name": name, "SPDXID": f"SPDXRef-{name}",
@@ -180,11 +186,11 @@ def sbom(output, manifest):
     relationships.append({"spdxElementId": "SPDXRef-zig", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-runtime"})
     for component in ("musl", "libunwind", "zig-runtime"):
         relationships.append({"spdxElementId": f"SPDXRef-{component}", "relationshipType": "DESCENDANT_OF", "relatedSpdxElement": "SPDXRef-sources"})
-    write_json(output / "runtime.spdx.json", {
+    return {
         "spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
         "name": "Roc Linux runtime", "documentNamespace": f"https://github.com/{REPOSITORY}/runtime/{archive_sha}",
-        "creationInfo": {"creators": ["Tool: roc-runtime-builder"], "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
-        "packages": packages, "files": files, "relationships": relationships})
+        "creationInfo": {"creators": ["Tool: roc-runtime-builder"], "created": created or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+        "packages": packages, "files": files, "relationships": relationships}
 
 
 def inspect(archive):

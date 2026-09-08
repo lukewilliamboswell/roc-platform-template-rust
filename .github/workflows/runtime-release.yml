@@ -2,11 +2,6 @@ name: Linux runtime release
 
 on:
   pull_request:
-    paths:
-      - 'runtime/**'
-      - 'ci/runtime*.py'
-      - 'ci/test_runtime*.py'
-      - '.github/workflows/runtime-release.yml'
   workflow_dispatch:
     inputs:
       version:
@@ -27,6 +22,7 @@ concurrency:
 
 jobs:
   build:
+    name: Runtime build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
@@ -56,6 +52,7 @@ jobs:
           retention-days: 30
 
   test:
+    name: Runtime test (${{ matrix.target }})
     needs: build
     strategy:
       fail-fast: false
@@ -88,6 +85,7 @@ jobs:
       contents: write
       id-token: write
       attestations: write
+    environment: runtime-release
     env:
       GH_TOKEN: ${{ github.token }}
       RUNTIME_TAG: ${{ needs.build.outputs.tag }}
@@ -98,7 +96,9 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
-          sparse-checkout: ci
+          sparse-checkout: |
+            ci
+            runtime
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: runtime-candidate

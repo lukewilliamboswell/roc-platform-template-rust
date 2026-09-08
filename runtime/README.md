@@ -39,13 +39,14 @@ without guessing an independent upstream version from compiled archives.
 
 ## Building and testing an unpublished candidate
 
-Requires Linux x86_64 and Python 3.12 or newer. The builder downloads and verifies
-its own pinned Zig toolchain. It never copies the old repository binaries.
+Requires Linux x86_64 and Python 3.12 or newer. The builder and native tests download and verify
+their own pinned Zig toolchains. Native test toolchains are pinned separately in
+`runtime/test-toolchains.json`. It never copies the old repository binaries.
 
 ```sh
 python3 -m unittest discover -s ci -p 'test_runtime*.py' -v
 python3 ci/runtime.py build
-./dist/runtime/smoke-x64musl
+python3 ci/runtime_release.py test --target x64musl
 ```
 
 `install-candidate` and `build.sh --runtime-candidate <archive>` are explicit
@@ -53,8 +54,9 @@ local/CI test operations for unpublished artifacts; they do not establish signed
 provenance. Routine CI and platform publication do not use these overrides.
 
 The runtime workflow builds once, then tests that same archive on native Linux
-x86_64 and ARM64 runners. The smoke programs link the explicit archive contents
-with `-nostdlib`, exercising allocation, libc startup and stack unwinding. Platform
+x86_64 and ARM64 runners. Each native job extracts the tar and compiles the reviewed smoke-test source
+against those exact libraries with `-nostdlib`, exercising allocation, libc startup
+and stack unwinding. No executable supplied by the build artifact is used. Platform
 examples check, build, run and test against the candidate during local testing and
 against the attested release in the separate platform adoption PR. The producer
 workflow has no Rust or Roc compiler dependency.
@@ -124,3 +126,14 @@ The workflow delegates orchestration to `ci/runtime_release.py` (`request`,
 `test`, `preflight`, `publish`, `verify`). Attestation policy is shared with the
 consumer in `ci/runtime.py`; GitHub job permissions and signing actions remain
 visible in the workflow.
+
+Release preflight rejects an SBOM unless its complete document matches the
+verified tar inventory and reviewed source metadata (only its validated creation
+time varies). File hashes, missing/extra entries, relationships, package/source
+metadata, the archive digest, and the published checksum sidecar are checked
+before signing. These checks validate consistency, not arbitrary library behavior.
+
+Runtime checks run on every PR so required-check rules cannot leave unrelated PRs
+waiting for a path-filtered workflow. Publication uses the `runtime-release`
+environment; its approval and branch restrictions are repository settings, not
+properties that YAML alone can enforce.
