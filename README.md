@@ -101,3 +101,9 @@ This platform exposes:
 - `Stdin.line!` - Read a line from stdin
 
 The main function receives command-line arguments as `List(Str)` and returns `Try({}, [Exit(I32), ..])`.
+
+## Independent Linux runtime releases
+
+The [runtime producer](runtime/README.md) builds Linux startup, libc, unwinding
+and Zig support libraries from checksum-pinned Zig sources. It tests both native
+architectures and can publish a separate attested release with an SPDX SBOM.

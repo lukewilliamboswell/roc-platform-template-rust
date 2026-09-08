@@ -1,0 +1,125 @@
+name: Linux runtime release
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Independent runtime version (e.g. 1.0.0)'
+        type: string
+        required: true
+      publish:
+        description: 'Attest and publish the tested runtime from main'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Runtime build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Validate release request
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+        run: python3 ci/runtime_release.py request
+      - name: Test archive verification boundaries
+        run: python3 -m unittest discover -s ci -p 'test_runtime*.py' -v
+      - name: Build from the checksum-pinned Zig distribution
+        env:
+          RUNTIME_TAG: ${{ steps.version.outputs.tag }}
+        run: python3 ci/runtime.py build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-candidate
+          path: dist/runtime/
+          if-no-files-found: error
+          retention-days: 30
+
+  test:
+    name: Runtime test (${{ matrix.target }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x64musl
+          - os: ubuntu-24.04-arm
+            target: arm64musl
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: runtime-candidate
+          path: dist/runtime
+      - name: Verify archive and run native libc and unwinding smoke test
+        run: python3 ci/runtime_release.py test --target ${{ matrix.target }}
+
+  publish:
+    needs: [build, test]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    environment: runtime-release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUNTIME_TAG: ${{ needs.build.outputs.tag }}
+    # Load release helpers from the exact trusted main commit, never from the
+    # downloaded artifact. No build tools or smoke binaries execute in this job.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          sparse-checkout: |
+            ci
+            runtime
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: runtime-candidate
+          path: dist/runtime
+      - name: Reject an existing release tag
+        run: python3 ci/runtime_release.py preflight
+      - name: Attest build provenance
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/runtime/linux-runtime.tar.gz
+      - name: Attest SPDX SBOM for the same archive
+        id: sbom
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/runtime/linux-runtime.tar.gz
+          sbom-path: dist/runtime/runtime.spdx.json
+      - name: Publish the tested archive and verification material
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_BUNDLE: ${{ steps.sbom.outputs.bundle-path }}
+        run: python3 ci/runtime_release.py publish
+      - name: Verify the published download and both attestations
+        run: python3 ci/runtime_release.py verify
