@@ -284,11 +284,11 @@ create_native_bundle() {
         lib_files+=("$lib")
       fi
     done
-    metadata=()
+    bundle_files=("${roc_files[@]}" "${lib_files[@]}")
     if [ -d runtime ]; then
-      while IFS= read -r file; do metadata+=("$file"); done < <(find runtime -type f | sort)
+      while IFS= read -r file; do bundle_files+=("$file"); done < <(find runtime -type f | sort)
     fi
-    roc bundle "${roc_files[@]}" "${lib_files[@]}" "${metadata[@]}" --output-dir "$temp_root"
+    roc bundle "${bundle_files[@]}" --output-dir "$temp_root"
   )
 }
 
