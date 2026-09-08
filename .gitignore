@@ -5,20 +5,17 @@ generated-docs/
 # Local Roc source checkouts
 roc-src/
 
-# Platform binaries (but not musl runtime files)
+# Platform binaries
 *.so
 *.dylib
 *.dll
-# Ignore .a files except musl runtime libraries
+# Runtime files and host archives are generated or downloaded
 *.a
-!platform/targets/*/libc.a
-!platform/targets/*/libunwind.a
 
-# Object files (but not musl crt1.o)
+# Object files
 *.obj
 *.lib
 *.o
-!platform/targets/*/crt1.o
 
 # Roc build artifacts
 *.rh
@@ -40,6 +37,10 @@ Cargo.lock
 # Claude Code
 .claude
 
-# Runtime producer output
-dist/
+# Local validation tools
+.tools/
 __pycache__/
+
+# Independently built runtime artifacts
+dist/
+platform/runtime/

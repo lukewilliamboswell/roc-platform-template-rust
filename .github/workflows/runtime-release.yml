@@ -4,10 +4,14 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      nightly_validation:
+        description: Validate a nightly candidate without publication
+        type: boolean
+        default: false
       version:
         description: 'Independent runtime version (e.g. 1.0.0)'
         type: string
-        required: true
+        required: false
       publish:
         description: 'Attest and publish the tested runtime from main'
         type: boolean
@@ -78,7 +82,7 @@ jobs:
 
   publish:
     needs: [build, test]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && !inputs.nightly_validation && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

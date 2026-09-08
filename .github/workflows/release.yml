@@ -9,7 +9,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: 'Release tag (e.g., v0.1.0)'
+        description: 'New package version (e.g., 1.1.0; no v prefix)'
         required: false
         type: string
   pull_request:
@@ -17,13 +17,37 @@ on:
 # Ensure only one release workflow runs at a time
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
+  attestations: read
 
 jobs:
+  release-policy:
+    if: github.event_name == 'workflow_dispatch' && !inputs.nightly_validation
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.policy.outputs.sha }}
+      version: ${{ steps.policy.outputs.version }}
+      compiler: ${{ steps.policy.outputs.compiler-pin }}
+      compiler-channel: ${{ steps.policy.outputs.compiler-channel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - id: policy
+        uses: lukewilliamboswell/roc-automation/actions/check-release@b60d561cbd53c911b29238b30624827f8487113a
+        with:
+          version: ${{ inputs.release_tag }}
+          compiler-root: platform/main.roc
+          allow-default-branch: 'true'
+          allow-nightly-bootstrap: 'true'
+
   build-and-bundle:
+    needs: release-policy
+    if: ${{ !cancelled() && (needs.release-policy.result == 'success' || needs.release-policy.result == 'skipped') }}
     name: Build and Bundle Platform
     runs-on: macos-15  # macOS can cross-compile to all targets
     outputs:
@@ -55,7 +79,9 @@ jobs:
 
       - name: Read pinned Roc nightly
         shell: bash
-        run: printf 'ROC_NIGHTLY_TAG=%s\n' "$(sed -n '1p' .roc-version)" >> "$GITHUB_ENV"
+        run: |
+          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
+          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
@@ -64,6 +90,8 @@ jobs:
           nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
 
       - name: Build platform for all targets
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./build.sh --all
 
       - name: Bundle platform
@@ -95,6 +123,7 @@ jobs:
           retention-days: 30
 
   test-bundle:
+    if: ${{ !cancelled() && needs.build-and-bundle.result == 'success' }}
     name: Test Bundle (${{ matrix.os }})
     needs: build-and-bundle
     strategy:
@@ -124,7 +153,9 @@ jobs:
 
       - name: Read pinned Roc nightly
         shell: bash
-        run: printf 'ROC_NIGHTLY_TAG=%s\n' "$(sed -n '1p' .roc-version)" >> "$GITHUB_ENV"
+        run: |
+          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
+          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
@@ -155,7 +186,9 @@ jobs:
 
       - name: Read pinned Roc nightly
         shell: bash
-        run: printf 'ROC_NIGHTLY_TAG=%s\n' "$(sed -n '1p' .roc-version)" >> "$GITHUB_ENV"
+        run: |
+          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
+          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
@@ -176,7 +209,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [build-and-bundle, test-bundle]
+    needs: [release-policy, build-and-bundle, test-bundle, build-docs]
     runs-on: ubuntu-24.04
     # Only run on manual trigger
     if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
@@ -195,23 +228,22 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.version }}
+          RELEASE_SHA: ${{ needs.release-policy.outputs.sha }}
+          ROC_COMPILER: ${{ needs.release-policy.outputs.compiler }}
+          COMPILER_CHANNEL: ${{ needs.release-policy.outputs.compiler-channel }}
+          BUNDLE_FILENAME: ${{ needs.build-and-bundle.outputs.bundle_filename }}
         run: |
-          BUNDLE_FILE=$(ls *.tar.zst | head -1)
-
-          if [ -z "$BUNDLE_FILE" ]; then
-            echo "Error: No bundle file found"
-            exit 1
-          fi
-
-          # Create release with auto-generated notes
-          gh release create "${{ github.event.inputs.release_tag }}" \
-            "$BUNDLE_FILE" \
-            --title "${{ github.event.inputs.release_tag }}" \
-            --generate-notes \
-            --notes "Platform bundle built with Rust (stable) and Roc nightly"
-
-          echo "Release created: ${{ github.event.inputs.release_tag }}"
-          echo "Bundle uploaded: $BUNDLE_FILE"
+          test -f "$BUNDLE_FILENAME"
+          # Fail closed for existing tags and API errors; never replace a release.
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_VERSION" > tags.json
+          python3 -c 'import json, os; assert not any(t["ref"] == "refs/tags/" + os.environ["RELEASE_VERSION"] for t in json.load(open("tags.json"))), "Release tag already exists"'
+          sha256sum "$BUNDLE_FILENAME" > SHA256SUMS
+          printf 'Compiler: `%s` (%s)\n\nTested source: `%s`\n\nPlatform: https://github.com/%s/releases/download/%s/%s\n' \
+            "$ROC_COMPILER" "$COMPILER_CHANNEL" "$RELEASE_SHA" "$GITHUB_REPOSITORY" "$RELEASE_VERSION" "$BUNDLE_FILENAME" > release-notes.md
+          gh release create "$RELEASE_VERSION" "$BUNDLE_FILENAME" SHA256SUMS \
+            --target "$RELEASE_SHA" --title "$RELEASE_VERSION" \
+            --generate-notes --notes-file release-notes.md
 
   deploy-docs:
     name: Deploy Docs to GitHub Pages

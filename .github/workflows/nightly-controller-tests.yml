@@ -2,8 +2,13 @@ name: Nightly configuration
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      nightly_validation:
+        description: Validate a nightly candidate
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   configuration:
-    uses: lukewilliamboswell/roc-automation/.github/workflows/check-config.yml@c6711b0f46ee57beda8e1db4f3eafcbcd9cddae2
+    uses: lukewilliamboswell/roc-automation/.github/workflows/check-config.yml@b60d561cbd53c911b29238b30624827f8487113a

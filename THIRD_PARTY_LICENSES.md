@@ -1,6 +1,21 @@
 # Third-Party Licenses
 
-This project bundles third-party libraries for static linking on Linux (musl) targets.
+Generated platform bundles include third-party libraries for static linking on Linux targets.
+The binaries are built and released independently; they are not tracked in this repository.
+See [runtime/source.json](runtime/source.json) for the checksum-pinned Zig distribution
+and [runtime/README.md](runtime/README.md) for provenance, SBOM and verification details.
+Exact upstream notices are copied from that distribution into each runtime archive
+and carried into platform bundles under `runtime/licenses/`.
+
+## Zig runtime
+
+Files: `platform/targets/*/libzigc.a`, `platform/targets/*/libcompiler_rt.a`
+
+Zig's runtime implementations are distributed under the MIT (Expat) license.
+The exact notice is included as `runtime/licenses/zig.txt` in generated bundles.
+The source is the Zig release pinned in `runtime/source.json`; these files supply
+support functions required by Zig 0.16's musl/unwind archives.
+
 
 ## musl libc
 

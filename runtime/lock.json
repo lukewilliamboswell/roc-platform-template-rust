@@ -1,6 +1,6 @@
 {
   "repository": "lukewilliamboswell/roc-platform-template-rust",
-  "tag": null,
-  "sha256": null,
-  "source_commit": null
+  "sha256": "bcd3adf272e82d6cb7ae9076dabde9be1c6e3961815d05ec188620ff015cfd05",
+  "source_commit": "ba9e16cc4f039eb023e33b648dd3b63fb2f8c137",
+  "tag": "runtime-v1.0.0"
 }
