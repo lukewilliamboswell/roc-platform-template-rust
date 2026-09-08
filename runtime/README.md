@@ -1,10 +1,7 @@
 # Independently released Linux runtime
 
-This producer change leaves the existing platform binaries and build process
-intact so it can land before the first runtime release. The adoption change will
-remove tracked archives/objects and make platform builds consume `runtime/lock.json`.
-The Linux runtime is built and versioned separately from the Rust host and Roc compiler.
-The consumer instructions below describe that subsequent adoption.
+The Linux runtime is built and versioned separately from the Rust host and Roc
+compiler. Platform builds pin the released archive in `runtime/lock.json`.
 macOS uses the system runtime and does not need this download for native builds.
 
 ## Inputs and contents
@@ -41,7 +38,7 @@ without guessing an independent upstream version from compiled archives.
 
 Requires Linux x86_64 and Python 3.12 or newer. The builder and native tests download and verify
 their own pinned Zig toolchains. Native test toolchains are pinned separately in
-`runtime/test-toolchains.json`. It never copies the old repository binaries.
+`runtime/test-toolchains.json`.
 
 ```sh
 python3 -m unittest discover -s ci -p 'test_runtime*.py' -v
@@ -58,7 +55,7 @@ x86_64 and ARM64 runners. Each native job extracts the tar and compiles the revi
 against those exact libraries with `-nostdlib`, exercising allocation, libc startup
 and stack unwinding. No executable supplied by the build artifact is used. Platform
 examples check, build, run and test against the candidate during local testing and
-against the attested release in the separate platform adoption PR. The producer
+against the attested release during routine platform CI. The producer
 workflow has no Rust or Roc compiler dependency.
 Only a successful, explicitly requested `main` run may sign and publish.
 
@@ -70,7 +67,7 @@ host does not rebuild or advance this runtime dependency.
 
 1. Review source/compiler changes and run the runtime workflow with publication
    disabled. Keep writes and OIDC permissions out of build/test jobs.
-2. Merge the reviewed producer workflow, builder and tests into `main`. Dispatch
+2. Merge reviewed runtime changes into `main`. Dispatch
    **Linux runtime release** on the exact intended `main` commit, with a new
    version and `publish: true`.
 3. The separate publication job downloads the tested artifact from that run,
@@ -84,13 +81,6 @@ host does not rebuild or advance this runtime dependency.
 5. Run normal platform CI and release-candidate tests with that lock before
    merging adoption. Future runtime updates follow the same separate release and
    reviewed lock update process.
-
-The initial lock deliberately contains nulls because no attested runtime release
-exists yet. Normal Linux/all-target builds fail with an actionable bootstrap
-message until adoption; they never silently use unverified binaries or fall back
-to building new runtime inputs. **Land the producer before adopting binary removal
-and the routine-build changes.** Runtime candidate tests can run before the first
-release. Do not merge an unbootstrapped consumer as a working platform build.
 
 An existing runtime tag is rejected. If publication partly succeeds, inspect the
 tag, commit, archive and attestation results; preserve them and use a reviewed
