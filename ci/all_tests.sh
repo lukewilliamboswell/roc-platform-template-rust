@@ -386,6 +386,8 @@ run_bundle_suite() {
 
 if [ "${RUN_PUBLIC_TESTS:-0}" = "1" ]; then
   public_root=$(mktemp -d "${TMPDIR:-/tmp}/platform-template-public.XXXXXX")
+  # Roc compares cache/workspace paths; macOS exposes /var through a symlink.
+  public_root=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$public_root")
   TEMP_DIRS+=("$public_root")
   mkdir -p "$public_root/examples"
   cp -R examples/. "$public_root/examples/"
