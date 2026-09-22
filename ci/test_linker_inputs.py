@@ -66,6 +66,15 @@ class LinkerInputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             linker_inputs.validate_lock(lock)
 
+    def test_rejects_untrusted_signer_identity(self):
+        for field, value in (("repository", "attacker/automation"),
+                             ("workflow", ".github/workflows/other.yml")):
+            with self.subTest(field=field):
+                lock = self.lock()
+                lock["signer"][field] = value
+                with self.assertRaisesRegex(ValueError, "signer"):
+                    linker_inputs.validate_lock(lock)
+
     def test_rejects_traversal_links_duplicates_and_unknown_members(self):
         for name, kind in [("../escape", tarfile.REGTYPE), ("/escape", tarfile.REGTYPE),
                            ("targets/x64mac/libSystem.tbd", tarfile.REGTYPE), ("unknown", tarfile.SYMTYPE)]:
@@ -124,7 +133,9 @@ class LinkerInputTests(unittest.TestCase):
         for call in run.call_args_list:
             args = call.args[0]
             self.assertEqual(args[args.index("--repo") + 1], linker_inputs.REPOSITORY)
-            self.assertEqual(args[args.index("--signer-repo") + 1], "lukewilliamboswell/roc-automation")
+            self.assertNotIn("--signer-repo", args)
+            self.assertEqual(args[args.index("--signer-workflow") + 1], "lukewilliamboswell/roc-automation/.github/workflows/publish-linker-inputs.yml")
+            self.assertEqual(args[args.index("--signer-digest") + 1], "b" * 40)
             self.assertEqual(args[args.index("--source-digest") + 1], "a" * 40)
             self.assertIn("--deny-self-hosted-runners", args)
             self.assertEqual(args[args.index("--predicate-type") + 1], "https://slsa.dev/provenance/v1")
