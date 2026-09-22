@@ -1,0 +1,21 @@
+{
+  "archive": {
+    "name": "linker-inputs.tar.gz",
+    "sha256": "a68b3650095ac4ff003789ce688f026c9c6e8e7cf6f5461ab75a01ba625c4d11",
+    "size": 4647298
+  },
+  "input_fingerprint": "49865484893140c9decd0f72c9658e2010cdbdffa022e879a2155612eb7edcba",
+  "repository": "lukewilliamboswell/roc-platform-template-rust",
+  "sbom_sha256": "8464ab24c443a76028aac8be1357009068a20394a7866adcfe543d5d3d5f36f0",
+  "schema_version": 1,
+  "signer": {
+    "repository": "lukewilliamboswell/roc-automation",
+    "source_commit": "4ce69c1aa52fbdc950643440f98152e2ecb64e43",
+    "workflow": ".github/workflows/publish-linker-inputs.yml"
+  },
+  "source": {
+    "commit": "e6873037bcc400695d9a1d7ee2593b5a2b8f51ec",
+    "ref": "refs/heads/main"
+  },
+  "tag": "linker-inputs-v1.0.1"
+}

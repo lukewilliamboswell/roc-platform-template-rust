@@ -78,7 +78,7 @@ build_target_native() {
     echo "  -> platform/targets/$target_name/libhost.a"
 }
 
-# Download and verify the independently released runtime before building hosts.
+# Download and verify the independently released linker inputs before building hosts.
 # An unpublished archive is accepted only with this explicit development flag.
 BUILD_ALL=0
 RUNTIME_CANDIDATE_PATH=""
@@ -95,7 +95,7 @@ if [ "$BUILD_ALL" = 1 ] || [[ "$(detect_native_target)" == *musl ]]; then
     if [ -n "$RUNTIME_CANDIDATE_PATH" ]; then
         python3 ci/runtime.py install-candidate "$RUNTIME_CANDIDATE_PATH"
     else
-        python3 ci/runtime.py fetch
+        python3 scripts/linker_inputs.py fetch
     fi
 fi
 
