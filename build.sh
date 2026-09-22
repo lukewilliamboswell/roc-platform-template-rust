@@ -44,7 +44,7 @@ build_target_cross() {
     local rust_triple=$(get_rust_triple "$target_name")
 
     echo "Building for $target_name ($rust_triple)..."
-    cargo build --release --lib --target "$rust_triple"
+    cargo build --release --locked --lib --target "$rust_triple"
 
     mkdir -p "platform/targets/$target_name"
     cp "target/$rust_triple/release/libhost.a" "platform/targets/$target_name/"
@@ -65,12 +65,12 @@ build_target_native() {
     if [[ "$target_name" == *"musl"* ]]; then
         # Linux: need explicit musl target
         rustup target add "$rust_triple" 2>/dev/null || true
-        cargo build --release --lib --target "$rust_triple"
+        cargo build --release --locked --lib --target "$rust_triple"
         mkdir -p "platform/targets/$target_name"
         cp "target/$rust_triple/release/libhost.a" "platform/targets/$target_name/"
     else
         # macOS: native is fine
-        cargo build --release --lib
+        cargo build --release --locked --lib
         mkdir -p "platform/targets/$target_name"
         cp "target/release/libhost.a" "platform/targets/$target_name/"
     fi

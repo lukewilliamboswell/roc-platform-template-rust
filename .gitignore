@@ -31,8 +31,7 @@ roc-src/
 # OS files
 .DS_Store
 
-# Cargo lock (we're a library/binary, not an application)
-Cargo.lock
+# Cargo.lock is committed because release and CI builds use --locked.
 
 # Claude Code
 .claude

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "library": "libSystem",
+  "install_name": "/usr/lib/libSystem.B.dylib",
+  "targets": ["x86_64-macos", "arm64-macos"],
+  "selection": "Public Darwin C/POSIX interfaces required by a Rust staticlib host; additions require review and native final-link tests.",
+  "symbols": [
+    "_CCRandomGenerateBytes", "__NSGetArgc", "__NSGetArgv", "__NSGetEnviron", "__NSGetExecutablePath",
+    "__Unwind_Backtrace", "__Unwind_GetCFA", "__Unwind_GetDataRelBase", "__Unwind_GetIP", "__Unwind_GetIPInfo",
+    "__Unwind_GetLanguageSpecificData", "__Unwind_GetRegionStart", "__Unwind_GetTextRelBase", "__Unwind_SetGR", "__Unwind_SetIP",
+    "___aarch64_have_lse_atomics", "___assert_rtn", "___compilerrt_abort_impl", "___error", "___stack_chk_fail", "___stack_chk_guard", "___udivti3",
+    "__dyld_get_image_header", "__dyld_get_image_name", "__dyld_get_image_vmaddr_slide", "__dyld_image_count", "__exit", "__tlv_atexit",
+    "_abort", "_accept", "_bind", "_calloc", "_chdir", "_chmod", "_chown", "_chroot", "_clock_gettime", "_close", "_closedir", "_confstr", "_connect",
+    "_copyfile_state_alloc", "_copyfile_state_free", "_copyfile_state_get", "_dirfd", "_dispatch_release", "_dispatch_semaphore_create",
+    "_dispatch_semaphore_signal", "_dispatch_semaphore_wait", "_dispatch_time", "_dlclose", "_dlerror", "_dlopen", "_dlsym", "_dup", "_dup2", "_execvp", "_exit",
+    "_fchmod", "_fchown", "_fclonefileat", "_fcntl", "_fcopyfile", "_fdopendir", "_flock", "_fork", "_free", "_freeaddrinfo", "_fsetattrlist", "_fstat", "_fstatat", "_ftruncate",
+    "_gai_strerror", "_getaddrinfo", "_getcwd", "_getenv", "_gethostname", "_getpeereid", "_getpeername", "_getpid", "_getppid", "_getpwuid_r", "_getsockname", "_getsockopt", "_getuid",
+    "_ioctl", "_kill", "_lchown", "_linkat", "_listen", "_lseek", "_lstat", "_mach_error_string", "_mach_timebase_info", "_mach_wait_until", "_malloc", "_memcmp", "_memcpy", "_memmove", "_memset",
+    "_mkdir", "_mkfifo", "_mmap", "_mprotect", "_munmap", "_nanosleep", "_open", "_openat", "_opendir", "_pause", "_pipe", "_poll", "_posix_memalign",
+    "_posix_spawn_file_actions_adddup2", "_posix_spawn_file_actions_destroy", "_posix_spawn_file_actions_init", "_posix_spawnattr_destroy", "_posix_spawnattr_init",
+    "_posix_spawnattr_setflags", "_posix_spawnattr_setpgroup", "_posix_spawnattr_setsigdefault", "_posix_spawnp", "_pread", "_pthread_attr_destroy", "_pthread_attr_init",
+    "_pthread_attr_setstacksize", "_pthread_cond_broadcast", "_pthread_cond_destroy", "_pthread_cond_signal", "_pthread_cond_timedwait_relative_np", "_pthread_cond_wait",
+    "_pthread_create", "_pthread_detach", "_pthread_get_stackaddr_np", "_pthread_get_stacksize_np", "_pthread_join", "_pthread_mutex_destroy", "_pthread_mutex_init",
+    "_pthread_mutex_lock", "_pthread_mutex_trylock", "_pthread_mutex_unlock", "_pthread_mutexattr_destroy", "_pthread_mutexattr_init", "_pthread_mutexattr_settype",
+    "_pthread_self", "_pthread_setname_np", "_pthread_threadid_np", "_pwrite", "_read", "_readdir_r", "_readlink", "_readv", "_realloc", "_realpath$DARWIN_EXTSN",
+    "_recv", "_recvfrom", "_rename", "_rmdir", "_sched_yield", "_send", "_sendto", "_setattrlist", "_setenv", "_setgid", "_setgroups", "_setpgid", "_setsid", "_setsockopt", "_setuid",
+    "_shutdown", "_sigaction", "_sigaddset", "_sigaltstack", "_sigemptyset", "_signal", "_socket", "_socketpair", "_stat", "_strerror_r", "_strlen", "_strnlen", "_symlink",
+    "_sysconf", "_sysctlbyname", "_unlink", "_unlinkat", "_unsetenv", "_waitpid", "_write", "_writev"
+  ],
+  "evidence": [
+    "https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/intro.3.html",
+    "https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/pthread.3.html",
+    "https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/dlsym.3.html"
+  ]
+}

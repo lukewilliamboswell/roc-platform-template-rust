@@ -16,6 +16,9 @@ done
 test -f runtime/manifest.json || { echo "Missing runtime provenance metadata; run ./build.sh --all" >&2; exit 1; }
 metadata=()
 while IFS= read -r file; do metadata+=("$file"); done < <(find runtime -type f | sort)
+if [ -d linker-inputs ]; then
+    while IFS= read -r file; do metadata+=("$file"); done < <(find linker-inputs -type f | sort)
+fi
 
 # Collect all .roc files
 roc_files=(*.roc)

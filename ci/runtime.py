@@ -221,7 +221,13 @@ def install(archive):
     destinations = {}
     for name, data in contents.items():
         dest = ROOT / "platform" / (name if name.startswith("targets/") else "runtime/" + name)
-        if any(p.is_symlink() for p in [dest, *dest.parents]):
+        platform_root = ROOT / "platform"
+        scoped = [platform_root]
+        cursor = platform_root
+        for component in dest.relative_to(platform_root).parts:
+            cursor = cursor / component
+            scoped.append(cursor)
+        if any(p.is_symlink() for p in scoped if p.exists()):
             raise ValueError(f"Symlink in runtime destination: {dest}")
         destinations[dest] = data
     for dest, data in destinations.items():
