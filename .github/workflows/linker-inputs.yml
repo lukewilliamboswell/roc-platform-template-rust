@@ -55,7 +55,7 @@ jobs:
       - name: Build deterministic candidate twice in isolated directories
         env:
           LINKER_INPUTS_TAG: ${{ needs.request.outputs.tag }}
-          PUBLISHER_SHA: 1652c3fbd62f7c201d47a7af66023d95d95e2b0f
+          PUBLISHER_SHA: 714fa0c68b4327ea097ae1b05d13c56769a1c3ed
         run: |
           python3 scripts/linker_inputs.py build --output dist/first
           python3 scripts/linker_inputs.py build --output dist/second
@@ -135,7 +135,7 @@ jobs:
       id-token: write
       attestations: write
     # Pinned to the reviewed controller commit; mutable refs are forbidden.
-    uses: lukewilliamboswell/roc-automation/.github/workflows/publish-linker-inputs.yml@1652c3fbd62f7c201d47a7af66023d95d95e2b0f
+    uses: lukewilliamboswell/roc-automation/.github/workflows/publish-linker-inputs.yml@714fa0c68b4327ea097ae1b05d13c56769a1c3ed
     with:
       release-tag: ${{ needs.request.outputs.tag }}
       artifact-name: linker-inputs-candidate
