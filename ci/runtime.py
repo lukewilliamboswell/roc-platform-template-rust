@@ -29,7 +29,6 @@ REPOSITORY = "lukewilliamboswell/roc-platform-template-rust"
 RUNTIME_FILES = {f"targets/{target}/{name}" for target in TARGETS for name in LIBRARIES}
 LICENSE_FILES = {"licenses/musl.txt", "licenses/libunwind.txt", "licenses/zig.txt"}
 MEMBERS = RUNTIME_FILES | LICENSE_FILES | {"manifest.json"}
-CANONICAL_BUILD_ROOT = b"/tmp/runtime-build-CANON000"
 
 
 def digest(data):
@@ -60,15 +59,6 @@ def check_sha(path, expected):
 
 def command(args, **kwargs):
     subprocess.run([str(arg) for arg in args], check=True, **kwargs)
-
-
-def canonicalize_build_root(path, build_root):
-    """Remove tempfile entropy embedded by Zig without changing object layout."""
-    random_root = str(build_root).encode()
-    if len(random_root) != len(CANONICAL_BUILD_ROOT):
-        raise ValueError("Runtime build root has an unexpected length")
-    contents = Path(path).read_bytes()
-    Path(path).write_bytes(contents.replace(random_root, CANONICAL_BUILD_ROOT))
 
 
 def install_zig(work, toolchain, version):
@@ -106,8 +96,14 @@ def build(output):
     source = read_json(ROOT / "runtime/source.json")
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="runtime-build-") as temporary:
-        work = Path(temporary)
+    # Zig incorporates build paths into cache keys and some generated archives.
+    # A stable, repository-scoped root makes independent invocations identical.
+    # Refuse an existing path instead of deleting a possibly user-controlled tree.
+    work = ROOT / ".runtime-build-work"
+    if work.exists() or work.is_symlink():
+        raise ValueError(f"Runtime build workspace already exists: {work}")
+    work.mkdir()
+    try:
         zig = install_zig(work, source | {"directory": f"zig-x86_64-linux-{source['zig_version']}"}, source["zig_version"])
         zig_root = zig.parent
         stage = work / "stage"
@@ -133,7 +129,6 @@ def build(output):
                 dest = stage / "targets" / target / name
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(matches[0], dest)
-                canonicalize_build_root(dest, work)
         licenses = stage / "licenses"
         licenses.mkdir()
         for dest, src in {"musl.txt": "lib/libc/musl/COPYRIGHT",
@@ -160,6 +155,8 @@ def build(output):
             "repository": REPOSITORY, "tag": os.environ.get("RUNTIME_TAG"), "sha256": sha,
             "source_commit": os.environ.get("GITHUB_SHA")})
         print(f"Built {output / ARTIFACT}: {sha}")
+    finally:
+        shutil.rmtree(work)
 
 
 def sbom_document(manifest, archive_sha, created=None):
