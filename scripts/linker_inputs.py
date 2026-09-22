@@ -221,7 +221,10 @@ def validate_lock(lock):
     source, signer = lock["source"], lock["signer"]
     if set(source) != {"commit", "ref"} or not HEX40.fullmatch(source["commit"] or "") or source["ref"] != "refs/heads/main":
         raise ValueError("Invalid locked source identity")
-    if set(signer) != {"repository", "workflow", "source_commit"} or not HEX40.fullmatch(signer["source_commit"] or ""):
+    if (set(signer) != {"repository", "workflow", "source_commit"}
+            or signer["repository"] != "lukewilliamboswell/roc-automation"
+            or signer["workflow"] != ".github/workflows/publish-linker-inputs.yml"
+            or not HEX40.fullmatch(signer["source_commit"] or "")):
         raise ValueError("Invalid signer identity")
     if not HEX64.fullmatch(lock["sbom_sha256"] or "") or not HEX64.fullmatch(lock["input_fingerprint"] or ""):
         raise ValueError("Invalid locked metadata digest")
@@ -243,7 +246,7 @@ def verify_attestations(path, lock):
     signer = lock["signer"]
     identity = f"{signer['repository']}/{signer['workflow']}"
     subprocess.run(["gh", "attestation", "verify", str(path), "--repo", REPOSITORY,
-                    "--signer-repo", signer["repository"], "--signer-workflow", identity,
+                    "--signer-workflow", identity,
                     "--signer-digest", signer["source_commit"],
                     "--source-ref", lock["source"]["ref"], "--source-digest", lock["source"]["commit"],
                     "--deny-self-hosted-runners", "--predicate-type", "https://slsa.dev/provenance/v1"], check=True)
