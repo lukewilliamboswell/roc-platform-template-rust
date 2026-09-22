@@ -130,6 +130,7 @@ jobs:
     needs: [request, build, linux-native, macos-native]
     if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
     permissions:
+      actions: read
       contents: write
       id-token: write
       attestations: write
