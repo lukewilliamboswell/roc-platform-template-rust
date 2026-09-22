@@ -4,7 +4,7 @@ set -euo pipefail
 root_dir="$(cd "$(dirname "$0")" && pwd)"
 cd "$root_dir/platform"
 
-# Refuse partial bundles; build.sh supplies verified runtime release contents.
+# Refuse partial bundles; build.sh supplies verified linker-input release contents.
 for target in x64musl arm64musl; do
     for file in crt1.o libc.a libunwind.a libzigc.a libcompiler_rt.a libhost.a; do
         test -f "targets/$target/$file" || { echo "Missing targets/$target/$file; run ./build.sh --all" >&2; exit 1; }
@@ -13,14 +13,14 @@ done
 for target in x64mac arm64mac; do
     test -f "targets/$target/libhost.a" || { echo "Missing targets/$target/libhost.a" >&2; exit 1; }
 done
-test -f runtime/manifest.json || { echo "Missing runtime provenance metadata; run ./build.sh --all" >&2; exit 1; }
+test -f linker-inputs/dependency.json || { echo "Missing linker-input provenance metadata; run ./build.sh --all" >&2; exit 1; }
 metadata=()
-while IFS= read -r file; do metadata+=("$file"); done < <(find runtime -type f | sort)
+while IFS= read -r file; do metadata+=("$file"); done < <(find linker-inputs -type f | sort)
 
 # Collect all .roc files
 roc_files=(*.roc)
 
-# Collect all host libraries and runtime files from targets directories
+# Collect all host libraries and linker inputs from target directories
 lib_files=()
 for lib in targets/*/*.a targets/*/*.o; do
     if [[ -f "$lib" ]]; then

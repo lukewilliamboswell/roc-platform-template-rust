@@ -107,8 +107,14 @@ def build(output):
     source = read_json(ROOT / "runtime/source.json")
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="runtime-build-") as temporary:
-        work = Path(temporary)
+    # Zig incorporates build paths into cache keys and some generated archives.
+    # A stable, repository-scoped root makes independent invocations identical.
+    # Refuse an existing path instead of deleting a possibly user-controlled tree.
+    work = ROOT / ".runtime-build-work"
+    if work.exists() or work.is_symlink():
+        raise ValueError(f"Runtime build workspace already exists: {work}")
+    work.mkdir()
+    try:
         zig = install_zig(work, source | {"directory": f"zig-x86_64-linux-{source['zig_version']}"}, source["zig_version"])
         zig_root = zig.parent
         stage = work / "stage"
@@ -160,6 +166,8 @@ def build(output):
             "repository": REPOSITORY, "tag": os.environ.get("RUNTIME_TAG"), "sha256": sha,
             "source_commit": os.environ.get("GITHUB_SHA")})
         print(f"Built {output / ARTIFACT}: {sha}")
+    finally:
+        shutil.rmtree(work)
 
 
 def input_fingerprint():
@@ -310,7 +318,13 @@ def install(archive):
     destinations = {}
     for name, data in contents.items():
         dest = ROOT / "platform" / (name if name.startswith("targets/") else "runtime/" + name)
-        if any(p.is_symlink() for p in [dest, *dest.parents]):
+        platform_root = ROOT / "platform"
+        scoped = [platform_root]
+        cursor = platform_root
+        for component in dest.relative_to(platform_root).parts:
+            cursor = cursor / component
+            scoped.append(cursor)
+        if any(p.is_symlink() for p in scoped if p.exists()):
             raise ValueError(f"Symlink in runtime destination: {dest}")
         destinations[dest] = data
     for dest, data in destinations.items():
