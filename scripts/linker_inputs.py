@@ -244,6 +244,7 @@ def verify_attestations(path, lock):
     identity = f"{signer['repository']}/{signer['workflow']}"
     subprocess.run(["gh", "attestation", "verify", str(path), "--repo", REPOSITORY,
                     "--signer-repo", signer["repository"], "--signer-workflow", identity,
+                    "--signer-digest", signer["source_commit"],
                     "--source-ref", lock["source"]["ref"], "--source-digest", lock["source"]["commit"],
                     "--deny-self-hosted-runners", "--predicate-type", "https://slsa.dev/provenance/v1"], check=True)
 
@@ -313,6 +314,7 @@ def fetch_and_check(stage_to=None):
         if digest(sbom.read_bytes()) != lock["sbom_sha256"]:
             raise ValueError("Locked SPDX SBOM digest mismatch")
         verify_attestations(archive, lock)
+        verify_attestations(sbom, lock)
         if stage_to:
             stage_contents(contents, stage_to)
 

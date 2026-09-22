@@ -125,6 +125,7 @@ class LinkerInputTests(unittest.TestCase):
             args = call.args[0]
             self.assertEqual(args[args.index("--repo") + 1], linker_inputs.REPOSITORY)
             self.assertEqual(args[args.index("--signer-repo") + 1], "lukewilliamboswell/roc-automation")
+            self.assertEqual(args[args.index("--signer-digest") + 1], "b" * 40)
             self.assertEqual(args[args.index("--source-digest") + 1], "a" * 40)
             self.assertIn("--deny-self-hosted-runners", args)
             self.assertEqual(args[args.index("--predicate-type") + 1], "https://slsa.dev/provenance/v1")

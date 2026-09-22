@@ -55,7 +55,7 @@ jobs:
       - name: Build deterministic candidate twice in isolated directories
         env:
           LINKER_INPUTS_TAG: ${{ needs.request.outputs.tag }}
-          PUBLISHER_SHA: 05d0143a4124a3bc7cc6fb16d57a5aee8cab608c
+          PUBLISHER_SHA: 4ce69c1aa52fbdc950643440f98152e2ecb64e43
         run: |
           python3 scripts/linker_inputs.py build --output dist/first
           python3 scripts/linker_inputs.py build --output dist/second
