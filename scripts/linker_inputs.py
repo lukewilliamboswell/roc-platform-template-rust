@@ -2,7 +2,6 @@
 """Build, verify, fetch and stage independently released linker inputs."""
 
 import argparse
-import datetime
 import gzip
 import hashlib
 import io
@@ -188,7 +187,7 @@ def sbom_document(manifest, archive_sha, created=None):
     return {
         "spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
         "name": "Roc Rust platform linker inputs", "documentNamespace": f"https://github.com/{REPOSITORY}/linker-inputs/{archive_sha}",
-        "creationInfo": {"creators": ["Tool: linker_inputs.py"], "created": created or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+        "creationInfo": {"creators": ["Tool: linker_inputs.py"], "created": created or "1970-01-01T00:00:00Z"},
         "packages": [{"name": ARTIFACT, "SPDXID": "SPDXRef-archive", "downloadLocation": "NOASSERTION", "filesAnalyzed": True, "licenseDeclared": "NOASSERTION", "copyrightText": "NOASSERTION", "checksums": [{"algorithm": "SHA256", "checksumValue": archive_sha}]}],
         "files": files, "relationships": relationships,
     }

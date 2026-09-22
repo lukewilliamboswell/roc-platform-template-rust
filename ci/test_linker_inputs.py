@@ -110,6 +110,13 @@ class LinkerInputTests(unittest.TestCase):
         self.assertIn(b"x86_64-macos, arm64-macos", first)
         self.assertIn(b"/usr/lib/libSystem.B.dylib", first)
 
+    def test_sbom_is_deterministic_by_default(self):
+        manifest = json.loads(self.contents["dependency.json"])
+        first = linker_inputs.sbom_document(manifest, "d" * 64)
+        second = linker_inputs.sbom_document(manifest, "d" * 64)
+        self.assertEqual(first, second)
+        self.assertEqual(first["creationInfo"]["created"], "1970-01-01T00:00:00Z")
+
     def test_attestations_are_scoped_to_pinned_cross_repo_signer(self):
         with patch.object(linker_inputs.subprocess, "run") as run:
             linker_inputs.verify_attestations(self.archive, self.lock())

@@ -29,6 +29,7 @@ REPOSITORY = "lukewilliamboswell/roc-platform-template-rust"
 RUNTIME_FILES = {f"targets/{target}/{name}" for target in TARGETS for name in LIBRARIES}
 LICENSE_FILES = {"licenses/musl.txt", "licenses/libunwind.txt", "licenses/zig.txt"}
 MEMBERS = RUNTIME_FILES | LICENSE_FILES | {"manifest.json"}
+CANONICAL_BUILD_ROOT = b"/tmp/runtime-build-CANON000"
 
 
 def digest(data):
@@ -59,6 +60,15 @@ def check_sha(path, expected):
 
 def command(args, **kwargs):
     subprocess.run([str(arg) for arg in args], check=True, **kwargs)
+
+
+def canonicalize_build_root(path, build_root):
+    """Remove tempfile entropy embedded by Zig without changing object layout."""
+    random_root = str(build_root).encode()
+    if len(random_root) != len(CANONICAL_BUILD_ROOT):
+        raise ValueError("Runtime build root has an unexpected length")
+    contents = Path(path).read_bytes()
+    Path(path).write_bytes(contents.replace(random_root, CANONICAL_BUILD_ROOT))
 
 
 def install_zig(work, toolchain, version):
@@ -123,6 +133,7 @@ def build(output):
                 dest = stage / "targets" / target / name
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(matches[0], dest)
+                canonicalize_build_root(dest, work)
         licenses = stage / "licenses"
         licenses.mkdir()
         for dest, src in {"musl.txt": "lib/libc/musl/COPYRIGHT",

@@ -39,6 +39,19 @@ class RuntimeTests(unittest.TestCase):
             path = self.root / 'platform' / (name if name.startswith('targets/') else 'runtime/' + name)
             self.assertEqual(path.read_bytes(), data)
 
+    def test_build_root_canonicalization_preserves_layout(self):
+        random_root = Path("/tmp/runtime-build-abcdefgh")
+        object_path = self.root / "runtime.o"
+        object_path.write_bytes(b"prefix:" + str(random_root).encode() + b":suffix")
+        runtime.canonicalize_build_root(object_path, random_root)
+        self.assertEqual(object_path.read_bytes(), b"prefix:" + runtime.CANONICAL_BUILD_ROOT + b":suffix")
+
+    def test_build_root_canonicalization_rejects_unexpected_length(self):
+        object_path = self.root / "runtime.o"
+        object_path.write_bytes(b"object")
+        with self.assertRaisesRegex(ValueError, "unexpected length"):
+            runtime.canonicalize_build_root(object_path, Path("/tmp/short"))
+
     def test_rejects_unsafe_and_duplicate_members_without_writes(self):
         for name, kind in [('../escape', tarfile.REGTYPE), ('/escape', tarfile.REGTYPE),
                            ('targets/x64musl/libc.a', tarfile.REGTYPE),

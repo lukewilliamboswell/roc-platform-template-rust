@@ -59,7 +59,7 @@ jobs:
         run: |
           python3 scripts/linker_inputs.py build --output dist/first
           python3 scripts/linker_inputs.py build --output dist/second
-          cmp dist/first/linker-inputs.tar.gz dist/second/linker-inputs.tar.gz
+          diff -r dist/first dist/second
           cp -R dist/first dist/linker-inputs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
