@@ -254,3 +254,9 @@ prospectively choose to deem waived or otherwise exclude such Section(s) of
 the License, but only in their entirety and only with respect to the Combined
 Software.
 ```
+# Redistributed linker inputs
+
+Platform bundles may contain independently released musl, LLVM libunwind and
+Zig runtime files, plus a project-authored macOS link interface. Their complete
+notices, license texts, source pins, provenance catalog and per-file hashes are
+bundled under `linker-inputs/`. See `linker-inputs/THIRD_PARTY_NOTICES.md`.

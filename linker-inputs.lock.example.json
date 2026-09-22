@@ -1,0 +1,21 @@
+{
+  "archive": {
+    "name": "linker-inputs.tar.gz",
+    "sha256": null,
+    "size": 0
+  },
+  "input_fingerprint": null,
+  "repository": "lukewilliamboswell/roc-platform-template-rust",
+  "schema_version": 1,
+  "signer": {
+    "repository": "lukewilliamboswell/roc-automation",
+    "source_commit": null,
+    "workflow": ".github/workflows/publish-linker-inputs.yml"
+  },
+  "source": {
+    "commit": null,
+    "ref": "refs/heads/main"
+  },
+  "sbom_sha256": null,
+  "tag": null
+}

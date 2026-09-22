@@ -64,7 +64,7 @@ This overwrites `src/roc_platform_abi.rs` with updated type definitions and host
 ./bundle.sh
 ```
 
-This creates a `.tar.zst` bundle containing all `.roc` files, prebuilt host libraries, verified Linux runtime files, and their license/manifest metadata. Run `./build.sh --all` first.
+This creates a `.tar.zst` bundle containing all `.roc` files, prebuilt host libraries, verified linker inputs, and their license, provenance, manifest, and SBOM metadata. Run `./build.sh --all` first.
 
 ## Running Tests
 
@@ -98,7 +98,7 @@ RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platfor
 | x64musl | `platform/targets/x64musl/libhost.a` |
 | arm64musl | `platform/targets/arm64musl/libhost.a` |
 
-Linux targets use an independently released runtime built from checksum-pinned Zig sources. No runtime binaries are tracked in Git. Builds verify the pinned archive’s digest and provenance/SBOM attestations before installation. See [runtime releases](runtime/README.md).
+External final-link inputs have an independent signed release stream. The new aggregate archive preserves the checksum-pinned Zig musl/libunwind runtime and adds project-authored macOS interfaces without copying Apple SDK files. `libhost.a` remains current-source output. See [linker inputs](linker-inputs/README.md). The existing [Linux runtime](runtime/README.md) remains the adopted input until the first aggregate release is published and its proposed lock is reviewed.
 
 ## Platform API
 

@@ -1,0 +1,143 @@
+name: Linker inputs
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Independent linker-input version, without prefix
+        type: string
+        required: false
+      publish:
+        description: Sign and publish from main after all native tests
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linker-inputs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  request:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.request.outputs.tag }}
+    steps:
+      - id: request
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+        shell: python
+        run: |
+          import os, re
+          version = os.environ.get("VERSION") or "0.0.0"
+          if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
+              raise SystemExit("version must be strict SemVer")
+          if os.environ.get("PUBLISH") == "true" and version == "0.0.0":
+              raise SystemExit("publication requires an explicit version")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"tag=linker-inputs-v{version}\n")
+
+  build:
+    needs: request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Test parser, extraction and staging boundaries
+        run: python3 -m unittest ci/test_linker_inputs.py ci/test_runtime.py -v
+      - name: Build deterministic candidate twice in isolated directories
+        env:
+          LINKER_INPUTS_TAG: ${{ needs.request.outputs.tag }}
+          PUBLISHER_SHA: 714fa0c68b4327ea097ae1b05d13c56769a1c3ed
+        run: |
+          python3 scripts/linker_inputs.py build --output dist/first
+          python3 scripts/linker_inputs.py build --output dist/second
+          diff -r dist/first dist/second
+          cp -R dist/first dist/linker-inputs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linker-inputs-candidate
+          path: dist/linker-inputs/
+          if-no-files-found: error
+          retention-days: 30
+
+  linux-native:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x64musl
+          - os: ubuntu-24.04-arm
+            target: arm64musl
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: linker-inputs-candidate
+          path: dist/linker-inputs
+      - name: Validate and stage exact candidate
+        run: python3 scripts/linker_inputs.py stage dist/linker-inputs/linker-inputs.tar.gz --destination platform
+      - name: Native static-link smoke test
+        run: python3 scripts/linker_inputs.py test-native dist/linker-inputs/linker-inputs.tar.gz --target ${{ matrix.target }}
+
+  macos-native:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            target: x64mac
+          - os: macos-15
+            target: arm64mac
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: linker-inputs-candidate
+          path: dist/linker-inputs
+      - run: python3 scripts/linker_inputs.py stage dist/linker-inputs/linker-inputs.tar.gz --destination platform
+      - name: Build current-source host with the exact pinned Rust toolchain
+        run: cargo build --release --lib --locked --target ${{ matrix.target == 'x64mac' && 'x86_64-apple-darwin' || 'aarch64-apple-darwin' }}
+      - name: Prove the generated interface satisfies a native final link
+        shell: bash
+        run: |
+          printf '%s\n' '#include <stdlib.h>' '#include <unistd.h>' 'int main(void) { void *p = malloc(8); free(p); return (int)write(1, "ok\\n", 3) < 0; }' > "$RUNNER_TEMP/smoke.c"
+          clang -c "$RUNNER_TEMP/smoke.c" -o "$RUNNER_TEMP/smoke.o"
+          clang -nostdlib "$RUNNER_TEMP/smoke.o" "platform/targets/${{ matrix.target }}/libSystem.tbd" -o "$RUNNER_TEMP/smoke"
+          "$RUNNER_TEMP/smoke"
+
+  publish:
+    needs: [request, build, linux-native, macos-native]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      attestations: write
+    # Pinned to the reviewed controller commit; mutable refs are forbidden.
+    uses: lukewilliamboswell/roc-automation/.github/workflows/publish-linker-inputs.yml@714fa0c68b4327ea097ae1b05d13c56769a1c3ed
+    with:
+      release-tag: ${{ needs.request.outputs.tag }}
+      artifact-name: linker-inputs-candidate
+      manifest-path: dependency.json
+      release-name: Rust platform linker inputs ${{ needs.request.outputs.tag }}

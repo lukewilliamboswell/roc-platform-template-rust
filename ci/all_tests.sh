@@ -296,6 +296,7 @@ create_native_bundle() {
   cp platform/Stdin.roc "$platform_dir/"
   cp platform/Stdout.roc "$platform_dir/"
   if [ -d platform/runtime ]; then cp -R platform/runtime "$platform_dir/"; fi
+  if [ -d platform/linker-inputs ]; then cp -R platform/linker-inputs "$platform_dir/"; fi
   write_native_target_platform_main "$native_target" "$platform_dir/main.roc"
   copy_native_target_files "$native_target" "$platform_dir"
 
@@ -312,6 +313,9 @@ create_native_bundle() {
     bundle_files=("${roc_files[@]}" "${lib_files[@]}")
     if [ -d runtime ]; then
       while IFS= read -r file; do bundle_files+=("$file"); done < <(find runtime -type f | sort)
+    fi
+    if [ -d linker-inputs ]; then
+      while IFS= read -r file; do bundle_files+=("$file"); done < <(find linker-inputs -type f | sort)
     fi
     roc bundle "${bundle_files[@]}" --output-dir "$temp_root"
   )
