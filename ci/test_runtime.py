@@ -131,6 +131,62 @@ class RuntimeTests(unittest.TestCase):
                 runtime.fetch()
             download.assert_not_called()
 
+    def locked_target(self, cache_bytes=None):
+        archive = self.root / 'target.tar'
+        target = 'x64musl'
+        names = {f'targets/{target}/{name}' for name in runtime.LIBRARIES} | runtime.LICENSE_FILES | {'manifest.json'}
+        with tarfile.open(archive, 'w') as tar:
+            for name in sorted(names):
+                data = self.contents[name]
+                member = tarfile.TarInfo(name)
+                member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
+        data = archive.read_bytes()
+        fingerprint = 'f' * 64
+        records = {}
+        for name in runtime.TARGETS:
+            records[name] = {'asset': f'link-inputs-{name}.tar', 'sha256': runtime.digest(data), 'size': len(data)}
+        lock = {
+            'schema_version': 1, 'kind': 'link-inputs', 'repository': runtime.REPOSITORY,
+            'release': 'linker-inputs-sha256-' + 'a' * 64,
+            'manifest': {'asset': runtime.RELEASE_MANIFEST, 'sha256': 'b' * 64},
+            'source': {'repository': runtime.REPOSITORY, 'sha': 'c' * 40,
+                       'ref': 'refs/heads/change-runtime',
+                       'workflow': runtime.REPOSITORY + '/' + runtime.WORKFLOW,
+                       'input_fingerprint': fingerprint},
+            'targets': records,
+        }
+        lock_path = self.root / 'link-inputs.lock.json'
+        runtime.write_json(lock_path, lock)
+        cache = self.root / 'cache'
+        cache.mkdir()
+        if cache_bytes is not None:
+            (cache / runtime.digest(data)).write_bytes(cache_bytes)
+        return target, data, fingerprint, lock_path, cache
+
+    def test_locked_cache_hit_is_rehashed_without_network(self):
+        target, data, fingerprint, lock_path, cache = self.locked_target()
+        (cache / runtime.digest(data)).write_bytes(data)
+        with patch.object(runtime, 'ROOT', self.root), patch.object(runtime, 'LOCK', lock_path), \
+             patch.object(runtime, 'input_fingerprint', return_value=fingerprint), \
+             patch.dict(runtime.os.environ, {'ROC_LINK_INPUT_CACHE': str(cache)}), \
+             patch.object(runtime, 'download') as download:
+            runtime.fetch_locked([target])
+        download.assert_not_called()
+        self.assertTrue((self.root / f'platform/targets/{target}/libc.a').is_file())
+
+    def test_corrupt_cache_entry_is_replaced_from_exact_release(self):
+        target, data, fingerprint, lock_path, cache = self.locked_target(b'corrupt')
+        def replace(url, destination):
+            self.assertIn('linker-inputs-sha256-', url)
+            Path(destination).write_bytes(data)
+        with patch.object(runtime, 'ROOT', self.root), patch.object(runtime, 'LOCK', lock_path), \
+             patch.object(runtime, 'input_fingerprint', return_value=fingerprint), \
+             patch.dict(runtime.os.environ, {'ROC_LINK_INPUT_CACHE': str(cache)}), \
+             patch.object(runtime, 'download', side_effect=replace) as download:
+            runtime.fetch_locked([target])
+        download.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()

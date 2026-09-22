@@ -39,6 +39,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Read linker-input cache identity
+        if: matrix.lane == 'current-source'
+        id: linker-inputs
+        shell: bash
+        run: |
+          if test -f runtime/link-inputs.lock.json; then
+            printf 'key=%s\n' "$(sha256sum runtime/link-inputs.lock.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          else
+            printf 'key=legacy-bootstrap\n' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore content-addressed linker-input archives
+        if: matrix.lane == 'current-source'
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: ~/.cache/roc-platform-template-rust/link-inputs
+          key: linker-inputs-${{ steps.linker-inputs.outputs.key }}
+
       - name: Install Zig
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:

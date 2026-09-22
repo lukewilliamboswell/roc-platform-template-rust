@@ -95,7 +95,11 @@ if [ "$BUILD_ALL" = 1 ] || [[ "$(detect_native_target)" == *musl ]]; then
     if [ -n "$RUNTIME_CANDIDATE_PATH" ]; then
         python3 ci/runtime.py install-candidate "$RUNTIME_CANDIDATE_PATH"
     else
-        python3 ci/runtime.py fetch
+        if [ "$BUILD_ALL" = 1 ]; then
+            python3 ci/runtime.py fetch --target x64musl --target arm64musl
+        else
+            python3 ci/runtime.py fetch --target "$(detect_native_target)"
+        fi
     fi
 fi
 

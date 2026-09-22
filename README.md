@@ -98,7 +98,7 @@ RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platfor
 | x64musl | `platform/targets/x64musl/libhost.a` |
 | arm64musl | `platform/targets/arm64musl/libhost.a` |
 
-Linux targets use an independently released runtime built from checksum-pinned Zig sources. No runtime binaries are tracked in Git. Builds verify the pinned archive’s digest and provenance/SBOM attestations before installation. See [runtime releases](runtime/README.md).
+Linux targets use independently released linker inputs built from checksum-pinned Zig sources. No runtime binaries are tracked in Git. Routine builds reuse a content-addressed local/Actions cache and verify the committed size and SHA-256 on every use; attestations are verified when the trusted publisher admits a release. This avoids network and rebuild work without treating a cache hit as trusted. `libhost.a` remains a separately invalidated host output. See [linker-input releases](runtime/README.md).
 
 ## Platform API
 
