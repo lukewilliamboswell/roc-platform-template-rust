@@ -24,10 +24,8 @@ jobs:
           ref: ${{ github.sha }}
       - name: Test archive admission boundaries
         run: python3 -m unittest discover -s ci -p 'test_runtime*.py' -v
-      - name: Build and package target-scoped archives
-        run: |
-          python3 ci/runtime.py build
-          python3 ci/runtime.py prepare-release
+      - name: Build runtime candidate
+        run: python3 ci/runtime.py build
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nightly-runtime-build
