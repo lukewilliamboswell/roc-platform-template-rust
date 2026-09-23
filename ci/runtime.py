@@ -26,6 +26,13 @@ LIBRARIES = ("crt1.o", "libc.a", "libunwind.a", "libzigc.a", "libcompiler_rt.a")
 ARTIFACT = "linux-runtime.tar.gz"
 WORKFLOW = ".github/workflows/runtime-release.yml"
 REPOSITORY = "lukewilliamboswell/roc-platform-template-rust"
+LOCK = ROOT / "runtime/link-inputs.lock.json"
+LEGACY_LOCK = ROOT / "runtime/lock.json"
+RELEASE_MANIFEST = "build-input-release.json"
+PRODUCER_INPUTS = (
+    "ci/runtime.py", "ci/runtime_release.py", "runtime/source.json",
+    "runtime/smoke.c", "runtime/test-toolchains.json", WORKFLOW,
+)
 RUNTIME_FILES = {f"targets/{target}/{name}" for target in TARGETS for name in LIBRARIES}
 LICENSE_FILES = {"licenses/musl.txt", "licenses/libunwind.txt", "licenses/zig.txt"}
 MEMBERS = RUNTIME_FILES | LICENSE_FILES | {"manifest.json"}
@@ -41,6 +48,10 @@ def read_json(path):
 
 def write_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+
+
+def canonical_json(path, value):
+    Path(path).write_bytes(json.dumps(value, sort_keys=True, separators=(",", ":")).encode() + b"\n")
 
 
 def download(url, destination):
@@ -159,6 +170,84 @@ def build(output):
         shutil.rmtree(work)
 
 
+def input_fingerprint():
+    """Hash committed producer inputs; release candidates must identify reviewed bytes."""
+    lines = []
+    for name in PRODUCER_INPUTS:
+        blob = subprocess.check_output(["git", "rev-parse", f"HEAD:{name}"], text=True).strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", blob):
+            raise ValueError(f"Producer input is not committed: {name}")
+        lines.append(f"{name}\0{blob}\n")
+    return digest("".join(lines).encode())
+
+
+def prepare_release(directory):
+    """Convert the tested combined candidate into target-scoped deterministic tar files."""
+    directory = Path(directory)
+    contents = inspect(directory / ARTIFACT)
+    assets = {}
+    for target in TARGETS:
+        asset = f"link-inputs-{target}.tar"
+        path = directory / asset
+        names = sorted(
+            {name for name in contents if name.startswith(f"targets/{target}/")}
+            | LICENSE_FILES | {"manifest.json"}
+        )
+        with tarfile.open(path, "w", format=tarfile.USTAR_FORMAT) as tar:
+            for name in names:
+                data = contents[name]
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                info.mode = 0o644
+                info.mtime = 0
+                tar.addfile(info, io.BytesIO(data))
+        assets[target] = {"asset": asset, "sha256": digest(path.read_bytes()), "size": path.stat().st_size}
+    source_sha = os.environ.get("GITHUB_SHA", "")
+    source_ref = os.environ.get("GITHUB_REF", "")
+    manifest = {
+        "schema_version": 1,
+        "kind": "link-inputs",
+        "source": {
+            "repository": REPOSITORY,
+            "sha": source_sha,
+            "ref": source_ref,
+            "workflow": f"{REPOSITORY}/{WORKFLOW}",
+            "input_fingerprint": input_fingerprint(),
+        },
+        "assets": assets,
+    }
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha) or not source_ref.startswith("refs/heads/"):
+        raise ValueError("Release preparation requires an exact GitHub branch commit")
+    canonical_json(directory / RELEASE_MANIFEST, manifest)
+
+
+def inspect_target_archive(archive, target):
+    expected = {f"targets/{target}/{name}" for name in LIBRARIES} | LICENSE_FILES | {"manifest.json"}
+    contents = {}
+    with tarfile.open(archive, "r:") as tar:
+        for member in tar:
+            if member.name not in expected or member.name in contents or not member.isfile() or member.size > 64 * 1024 * 1024:
+                raise ValueError(f"Unexpected linker-input archive member: {member.name}")
+            contents[member.name] = tar.extractfile(member).read()
+    if set(contents) != expected:
+        raise ValueError("Linker-input archive is incomplete")
+    manifest = json.loads(contents["manifest.json"])
+    for name in expected - {"manifest.json"}:
+        if digest(contents[name]) != manifest.get("files", {}).get(name):
+            raise ValueError(f"Linker-input member digest mismatch: {name}")
+    return contents
+
+
+def install_target_archive(archive, target):
+    contents = inspect_target_archive(archive, target)
+    for name, data in contents.items():
+        dest = ROOT / "platform" / (name if name.startswith("targets/") else "runtime/" + name)
+        if any(path.is_symlink() for path in [dest, *dest.parents]):
+            raise ValueError(f"Symlink in linker-input destination: {dest}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+
+
 def sbom_document(manifest, archive_sha, created=None):
     """An explicit SPDX inventory; no guessed upstream versions from stripped archives."""
     source = manifest["source"]
@@ -251,8 +340,8 @@ def verify_attestations(archive, source_commit):
                  "--predicate-type", predicate])
 
 
-def fetch():
-    lock = read_json(ROOT / "runtime/lock.json")
+def fetch_legacy():
+    lock = read_json(LEGACY_LOCK)
     if not isinstance(lock.get("tag"), str) or not re.fullmatch(r"runtime-v[0-9]+\.[0-9]+\.[0-9]+", lock["tag"]):
         raise ValueError("Runtime release is not bootstrapped. Publish runtime-release.yml, review its proposed lock, then commit runtime/lock.json. See runtime/README.md.")
     if lock.get("repository") != REPOSITORY or not re.fullmatch(r"[0-9a-f]{40}", lock.get("source_commit") or ""):
@@ -265,12 +354,72 @@ def fetch():
         install(archive)
 
 
+def fetch_locked(targets):
+    """Use the reviewed content lock; the cache saves traffic but never supplies trust."""
+    lock = read_json(LOCK)
+    if (not isinstance(lock, dict)
+            or set(lock) != {"schema_version", "kind", "repository", "release", "manifest", "source", "targets"}
+            or lock.get("schema_version") != 1 or lock.get("kind") != "link-inputs"
+            or lock.get("repository") != REPOSITORY
+            or not re.fullmatch(r"linker-inputs-sha256-[0-9a-f]{64}", lock.get("release", ""))
+            or set(lock.get("targets", {})) != set(TARGETS)):
+        raise ValueError("Unsupported linker-input lock")
+    manifest = lock.get("manifest")
+    if (not isinstance(manifest, dict) or set(manifest) != {"asset", "sha256"}
+            or manifest.get("asset") != RELEASE_MANIFEST
+            or not re.fullmatch(r"[0-9a-f]{64}", manifest.get("sha256", ""))):
+        raise ValueError("Invalid linker-input manifest identity")
+    source = lock.get("source")
+    if (not isinstance(source, dict)
+            or set(source) != {"repository", "sha", "ref", "workflow", "input_fingerprint"}
+            or source.get("repository") != REPOSITORY
+            or not re.fullmatch(r"[0-9a-f]{40}", source.get("sha", ""))
+            or not re.fullmatch(r"refs/heads/[A-Za-z0-9._/-]+", source.get("ref", ""))
+            or source.get("workflow") != f"{REPOSITORY}/{WORKFLOW}"):
+        raise ValueError("Invalid linker-input producer identity")
+    fingerprint = input_fingerprint()
+    if source.get("input_fingerprint") != fingerprint:
+        raise ValueError("Linker-input producer inputs changed; publish and adopt a new content lock")
+    cache = Path(os.environ.get("ROC_LINK_INPUT_CACHE", Path.home() / ".cache/roc-platform-template-rust/link-inputs"))
+    cache.mkdir(parents=True, exist_ok=True)
+    for target in targets:
+        record = lock["targets"][target]
+        if (not isinstance(record, dict) or set(record) != {"asset", "sha256", "size"}
+                or not isinstance(record.get("size"), int) or isinstance(record.get("size"), bool)
+                or record["size"] <= 0
+                or not re.fullmatch(r"[0-9a-f]{64}", record.get("sha256", ""))
+                or not re.fullmatch(r"[A-Za-z0-9._-]+\.tar", record.get("asset", ""))):
+            raise ValueError(f"Invalid linker-input lock record: {target}")
+        archive = cache / record["sha256"]
+        valid = archive.is_file() and archive.stat().st_size == record["size"] and digest(archive.read_bytes()) == record["sha256"]
+        if not valid:
+            if archive.exists():
+                archive.unlink()
+            download(f"https://github.com/{REPOSITORY}/releases/download/{lock['release']}/{record['asset']}", archive)
+        if archive.stat().st_size != record["size"] or digest(archive.read_bytes()) != record["sha256"]:
+            archive.unlink(missing_ok=True)
+            raise ValueError(f"Downloaded linker-input archive differs from lock: {target}")
+        install_target_archive(archive, target)
+
+
+def fetch(targets=None):
+    targets = targets or list(TARGETS)
+    if LOCK.exists():
+        fetch_locked(targets)
+    else:
+        # Bootstrap only: remove this branch after the publisher adds the first
+        # signed content lock. It consumes the existing release; it never builds.
+        fetch_legacy()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     build_parser = commands.add_parser("build")
     build_parser.add_argument("--output", type=Path, default=ROOT / "dist/runtime")
-    commands.add_parser("fetch")
+    fetch_parser = commands.add_parser("fetch")
+    fetch_parser.add_argument("--target", action="append", choices=TARGETS)
+    commands.add_parser("prepare-release")
     for name in ("inspect", "install-candidate"):
         p = commands.add_parser(name)
         p.add_argument("archive", type=Path)
@@ -278,7 +427,9 @@ def main():
     if args.command == "build":
         build(args.output)
     elif args.command == "fetch":
-        fetch()
+        fetch(args.target or list(TARGETS))
+    elif args.command == "prepare-release":
+        prepare_release(ROOT / "dist/runtime")
     elif args.command == "inspect":
         inspect(args.archive)
     else:

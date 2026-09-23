@@ -16,6 +16,10 @@ directory. The generator never reads SDK/system `.tbd` files. The archive also
 contains the catalog, its provenance, full Linux licenses, a dependency
 manifest and an SPDX inventory.
 
-Release tags are `linker-inputs-vX.Y.Z`. After merging, dispatch
-`.github/workflows/linker-inputs.yml`; publish only from the repository default
-branch. Adopt the emitted proposed lock in a separate reviewed change.
+Publication uses the dispatch-only pull-request candidate and trusted publisher
+described in [the runtime release guide](../runtime/README.md). Routine pull
+requests consume the committed content lock and never invoke a producer. This
+prevents cache misses or unrelated reviews from rebuilding an already selected
+dependency. A future change to the aggregate target inventory, including the
+project-authored macOS interfaces, must extend that single candidate lifecycle
+rather than adding a second producer or lock.

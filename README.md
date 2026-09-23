@@ -98,7 +98,7 @@ RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platfor
 | x64musl | `platform/targets/x64musl/libhost.a` |
 | arm64musl | `platform/targets/arm64musl/libhost.a` |
 
-External final-link inputs have an independent signed release stream. The aggregate archive preserves the checksum-pinned Zig musl/libunwind runtime and adds project-authored macOS interfaces without copying Apple SDK files. `libhost.a` remains current-source output. The reviewed content-addressed lock pins the archive, SBOM, producer commit, and trusted publisher identity; see [linker inputs](linker-inputs/README.md).
+External final-link inputs have an independent signed release stream. The aggregate archive preserves the checksum-pinned Zig musl/libunwind runtime and adds project-authored macOS interfaces without copying Apple SDK files. Routine builds reuse its content-addressed cache and verify the committed size and SHA-256 on every use, so a cache hit avoids network traffic without becoming a trust decision. `libhost.a` remains current-source output. The reviewed lock pins the archive, SBOM, producer commit, and trusted publisher identity; see [linker inputs](linker-inputs/README.md).
 
 ## Platform API
 
