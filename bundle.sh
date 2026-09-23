@@ -13,9 +13,9 @@ done
 for target in x64mac arm64mac; do
     test -f "targets/$target/libhost.a" || { echo "Missing targets/$target/libhost.a" >&2; exit 1; }
 done
-test -f linker-inputs/dependency.json || { echo "Missing linker-input provenance metadata; run ./build.sh --all" >&2; exit 1; }
+test -f runtime/manifest.json || { echo "Missing linker-input provenance metadata; run ./build.sh --all" >&2; exit 1; }
 metadata=()
-while IFS= read -r file; do metadata+=("$file"); done < <(find linker-inputs -type f | sort)
+while IFS= read -r file; do metadata+=("$file"); done < <(find runtime -type f | sort)
 
 # Collect all .roc files
 roc_files=(*.roc)
