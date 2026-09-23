@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "link-inputs",
+  "repository": "lukewilliamboswell/roc-platform-template-rust",
+  "release": "linker-inputs-sha256-cd3fcbe71b125e036c5d47826db63290ffb4b87b42b679d8c566531b90202bde",
+  "manifest": {
+    "asset": "build-input-release.json",
+    "sha256": "cd3fcbe71b125e036c5d47826db63290ffb4b87b42b679d8c566531b90202bde"
+  },
+  "source": {
+    "input_fingerprint": "9161faaf9285145a2722de7d7eea4590fbeef862178c059b22f41f0540b406de",
+    "ref": "refs/heads/adopt/content-addressed-linker-inputs",
+    "repository": "lukewilliamboswell/roc-platform-template-rust",
+    "sha": "ca38f4e9f2a99def3f1099836f839c849aadce15",
+    "workflow": "lukewilliamboswell/roc-platform-template-rust/.github/workflows/runtime-release.yml"
+  },
+  "targets": {
+    "arm64musl": {
+      "asset": "link-inputs-arm64musl.tar",
+      "sha256": "4603e2aceee41c42fb0677821dfa6c85521dd0ecda4d97010493d40c081e6ac3",
+      "size": 10516480
+    },
+    "x64musl": {
+      "asset": "link-inputs-x64musl.tar",
+      "sha256": "8b0447401a72612c9b37f47076ea1511dcb7f6b72e6e1a13f6d15d82124f4e2f",
+      "size": 9973760
+    }
+  }
+}
