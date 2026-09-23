@@ -27,7 +27,6 @@ ARTIFACT = "linux-runtime.tar.gz"
 WORKFLOW = ".github/workflows/runtime-release.yml"
 REPOSITORY = "lukewilliamboswell/roc-platform-template-rust"
 LOCK = ROOT / "runtime/link-inputs.lock.json"
-LEGACY_LOCK = ROOT / "runtime/lock.json"
 RELEASE_MANIFEST = "build-input-release.json"
 PRODUCER_INPUTS = (
     "ci/runtime.py", "ci/runtime_release.py", "runtime/source.json",
@@ -340,20 +339,6 @@ def verify_attestations(archive, source_commit):
                  "--predicate-type", predicate])
 
 
-def fetch_legacy():
-    lock = read_json(LEGACY_LOCK)
-    if not isinstance(lock.get("tag"), str) or not re.fullmatch(r"runtime-v[0-9]+\.[0-9]+\.[0-9]+", lock["tag"]):
-        raise ValueError("Runtime release is not bootstrapped. Publish runtime-release.yml, review its proposed lock, then commit runtime/lock.json. See runtime/README.md.")
-    if lock.get("repository") != REPOSITORY or not re.fullmatch(r"[0-9a-f]{40}", lock.get("source_commit") or ""):
-        raise ValueError("Runtime lock must pin the trusted repository and source commit")
-    with tempfile.TemporaryDirectory(prefix="runtime-download-") as temp:
-        archive = Path(temp) / ARTIFACT
-        download(f"https://github.com/{REPOSITORY}/releases/download/{lock['tag']}/{ARTIFACT}", archive)
-        check_sha(archive, lock["sha256"])
-        verify_attestations(archive, lock["source_commit"])
-        install(archive)
-
-
 def fetch_locked(targets):
     """Use the reviewed content lock; the cache saves traffic but never supplies trust."""
     lock = read_json(LOCK)
@@ -404,12 +389,9 @@ def fetch_locked(targets):
 
 def fetch(targets=None):
     targets = targets or list(TARGETS)
-    if LOCK.exists():
-        fetch_locked(targets)
-    else:
-        # Bootstrap only: remove this branch after the publisher adds the first
-        # signed content lock. It consumes the existing release; it never builds.
-        fetch_legacy()
+    if not LOCK.exists():
+        raise ValueError("No publisher-generated linker-input lock; run the trusted PR publisher")
+    fetch_locked(targets)
 
 
 def main():

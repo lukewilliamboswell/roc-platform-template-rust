@@ -74,60 +74,10 @@ class RuntimeTests(unittest.TestCase):
             runtime.install(self.archive)
         self.assertEqual(list(outside.iterdir()), [])
 
-    def lock(self):
-        return {'repository': runtime.REPOSITORY, 'tag': 'runtime-v1.0.0',
-                'source_commit': 'a' * 40, 'sha256': runtime.digest(self.archive.read_bytes())}
-
-    def download(self, url, destination):
-        Path(destination).write_bytes(self.archive.read_bytes())
-
-    def test_failed_provenance_or_sbom_never_installs(self):
-        for failures in [[subprocess.CalledProcessError(1, 'gh')],
-                         [None, subprocess.CalledProcessError(1, 'gh')]]:
-            with self.subTest(failures=len(failures)), \
-                 patch.object(runtime, 'read_json', return_value=self.lock()), \
-                 patch.object(runtime, 'download', side_effect=self.download), \
-                 patch.object(runtime, 'command', side_effect=failures), \
-                 patch.object(runtime, 'install') as install:
-                with self.assertRaises(subprocess.CalledProcessError):
-                    runtime.fetch()
-                install.assert_not_called()
-
-    def test_archive_digest_checked_before_attestations(self):
-        lock = self.lock()
-        lock['sha256'] = '0' * 64
-        with patch.object(runtime, 'read_json', return_value=lock), \
-             patch.object(runtime, 'download', side_effect=self.download), \
-             patch.object(runtime, 'command') as command, \
-             patch.object(runtime, 'install') as install:
-            with self.assertRaises(ValueError):
-                runtime.fetch()
-            command.assert_not_called()
-            install.assert_not_called()
-
-    def test_both_attestations_are_scoped_to_reviewed_identity(self):
-        with patch.object(runtime, 'read_json', return_value=self.lock()), \
-             patch.object(runtime, 'download', side_effect=self.download), \
-             patch.object(runtime, 'command') as command, \
-             patch.object(runtime, 'install') as install:
-            runtime.fetch()
-            self.assertEqual(command.call_count, 2)
-            predicates = set()
-            for call in command.call_args_list:
-                args = call.args[0]
-                for flag, value in [('--repo', runtime.REPOSITORY),
-                                    ('--signer-workflow', runtime.REPOSITORY + '/' + runtime.WORKFLOW),
-                                    ('--source-ref', 'refs/heads/main'), ('--source-digest', 'a' * 40)]:
-                    self.assertEqual(args[args.index(flag) + 1], value)
-                self.assertIn('--deny-self-hosted-runners', args)
-                predicates.add(args[args.index('--predicate-type') + 1])
-            self.assertEqual(predicates, {'https://slsa.dev/provenance/v1', 'https://spdx.dev/Document'})
-            install.assert_called_once()
-
     def test_unbootstrapped_lock_does_not_download(self):
-        with patch.object(runtime, 'read_json', return_value={'tag': None}), \
+        with patch.object(runtime, 'LOCK', self.root / 'missing.lock.json'), \
              patch.object(runtime, 'download') as download:
-            with self.assertRaisesRegex(ValueError, 'not bootstrapped'):
+            with self.assertRaisesRegex(ValueError, 'publisher-generated'):
                 runtime.fetch()
             download.assert_not_called()
 
