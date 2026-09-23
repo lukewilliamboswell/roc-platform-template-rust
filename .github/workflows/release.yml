@@ -98,8 +98,12 @@ jobs:
         id: bundle
         run: |
           # Run bundle.sh and capture output
+          set +e
           BUNDLE_OUTPUT=$(./bundle.sh 2>&1)
+          BUNDLE_STATUS=$?
+          set -e
           echo "$BUNDLE_OUTPUT"
+          test "$BUNDLE_STATUS" -eq 0 || exit "$BUNDLE_STATUS"
 
           # Extract the tar.zst filename from "Created: /path/to/HASH.tar.zst" line
           BUNDLE_PATH=$(echo "$BUNDLE_OUTPUT" | grep "^Created:" | awk '{print $2}')
