@@ -2,7 +2,7 @@
   "workflows": [
     "ci.yml",
     "release.yml",
-    "runtime-release.yml",
+    "nightly-runtime.yml",
     "nightly-controller-tests.yml"
   ],
   "compiler_roots": [
