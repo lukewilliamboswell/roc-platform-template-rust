@@ -34,13 +34,26 @@ targets, tests each archive on its native architecture, emits canonical
 `build-input-release.json`, and attests that manifest and both archives. It has no
 repository or release write authority.
 
-Open a same-repository PR containing the material producer change, then dispatch
-**Publish linker inputs** from the default branch with that PR number. The trusted
-wrapper pins `roc-automation/actions/publish-build-inputs` to a reviewed full SHA.
-It dispatches the exact PR head, verifies workflow identity, source identity,
-hashes, target inventory, and attestations, publishes a manifest-hash-derived
-immutable release, and adds only `runtime/link-inputs.lock.json` as a lease-guarded
-GitHub-signed commit to the PR.
+Use this order when the producer fingerprint changes:
+
+1. Stage the material change in a same-repository PR. Ordinary validation may
+   report a stale lock until the new release is adopted.
+2. Optionally dispatch `runtime-release.yml` on the PR branch with
+   `release_candidate=true` and `expected_sha` set to its exact head. Review the
+   native tests, manifest, archive hashes, and attestations. This unprivileged
+   preview creates no release and changes no lock.
+3. From `main`, dispatch **Publish linker inputs** (`publish-linker-inputs.yml`)
+   with `pull-request` set to that PR number. Its full-SHA-pinned trusted wrapper
+   reruns the producer at the exact PR head, verifies workflow and source
+   identity, hashes, target inventory, and attestations, publishes an immutable
+   manifest-hash-derived release, and appends a lease-guarded, GitHub-signed
+   `runtime/link-inputs.lock.json`-only commit to the PR.
+4. Review the lock as a dependency update and rerun routine CI against the
+   released bytes. Merge with a merge commit after all required checks pass.
+   Build and publish the Roc platform bundle later through its separate release
+   workflow, using the adopted lock.
+
+The optional preview does not replace the publisher's own producer run.
 
 The split authority is intentional: PR code may compile, but cannot publish or
 write its own asserted lock; trusted default-branch code may publish inert tested
@@ -48,9 +61,8 @@ bytes, but never executes scripts from the candidate artifact. Keeping the
 PR-built release after merge preserves the exact source-to-tests-to-attestation
 chain. Do not rebuild or promote it on `main`.
 
-Review the generated lock as a dependency update and rerun routine CI. Merge with
-a merge commit so both the attested producer commit and signed lock-only commit
-remain visible. Changed candidate bytes require a new content identity; never
+The merge commit keeps both the attested producer commit and signed lock-only
+commit visible. Changed candidate bytes require a new content identity; never
 replace a published asset or move its tag.
 
 ## Routine consumption
