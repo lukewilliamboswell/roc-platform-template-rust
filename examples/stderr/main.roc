@@ -1,4 +1,4 @@
-app [main!] { roc: "nightly-2026-10-12-2664a27", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" }
+app [main!] { roc: "nightly-2026-10-13-b17d287", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" }
 
 import pf.Stdout
 import pf.Stderr
