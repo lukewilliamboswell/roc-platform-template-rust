@@ -195,9 +195,24 @@ jobs:
           BUNDLE: ${{ needs.build.outputs.bundle_filename }}
         run: blueprint run examples -- --operation test --archive "dist/roc-platform-template-rust-examples-$VERSION.zip" --bundle "dist/$BUNDLE"
 
+  runtime-tests:
+    name: Runtime tooling regressions
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          install-nix: 'true'
+      - run: blueprint run runtime-cli-tests
+
   attest:
     name: Attest the tested files
-    needs: [validate, build, test]
+    needs: [validate, build, test, runtime-tests]
     if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -217,7 +232,7 @@ jobs:
 
   publish:
     name: Create GitHub Release
-    needs: [validate, build, test, attest]
+    needs: [validate, build, test, runtime-tests, attest]
     if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     environment: release
@@ -281,7 +296,7 @@ jobs:
   required:
     name: Release required
     if: always()
-    needs: [validate, build, test]
+    needs: [validate, build, test, runtime-tests]
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
