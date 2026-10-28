@@ -9,7 +9,7 @@ you want to change the host or the platform interface.
 
 The https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/latest[latest release]
 contains a platform bundle and examples that name that exact bundle.
-The ../index.html[API reference] describes the latest published platform;
+The https://lukewilliamboswell.github.io/roc-platform-template-rust/[API reference] describes the latest published platform;
 this manual describes repository maintenance at version {docs-version}.
 
 include::getting-started.adoc[leveloffset=+1]

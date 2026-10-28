@@ -17,7 +17,7 @@ error and return a failure status.
 | `Stdin.line!` | Read a line from standard input.
 |===
 
-The ../index.html[generated API reference] documents the public Roc types.
+The https://lukewilliamboswell.github.io/roc-platform-template-rust/[generated API reference] documents the public Roc types.
 The Rust host owns allocation, process I/O and the generated ABI boundary.
 
 == Targets and validation
