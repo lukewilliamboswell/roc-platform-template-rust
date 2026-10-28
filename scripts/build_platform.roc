@@ -32,6 +32,9 @@ main! = |args| {
 		other => if (Targets.all.contains(other)) [other] else return Err(UnknownTarget(other))
 	}
 	install_linker_inputs!(selected, options.runtime_candidate)?
+	if options.skip_host {
+		return Script.pass!("Verified linker inputs; reusing fingerprinted host archives")
+	}
 	for target in selected {
 		build!(target, target == native)?
 	}
@@ -58,7 +61,6 @@ build! = |target, is_native| {
 		run!("cargo", ["build", "--release", "--locked", "--lib"])?
 		copy_host!(target, "target/release/libhost.a")
 	} else {
-		run!("rustup", ["target", "add", triple])?
 		run!("cargo", ["build", "--release", "--locked", "--lib", "--target", triple])?
 		copy_host!(target, "target/${triple}/release/libhost.a")
 	}
@@ -76,6 +78,7 @@ run! = |program, args| Script.command(program).run!(args.map(OsStr.from_str))
 cli_parser = Cli.assert_valid(
 	Cli.finish(
 		{
+			skip_host: Opt.flag({ short: "", long: "skip-host", help: "Verify/install linker inputs without compiling cached hosts.", default: Bool.False }),
 			target: Opt.str({ short: "", long: "target", help: "native (default), all, or one of x64mac, arm64mac, x64musl, arm64musl.", default: Value("native") }),
 			runtime_candidate: Opt.str({ short: "", long: "runtime-candidate", help: "Unpublished linker-input archive to install instead of the release.", default: Value("") }),
 		}.Cli,

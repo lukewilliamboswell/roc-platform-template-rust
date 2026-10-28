@@ -15,6 +15,7 @@ import src/Files
 import src/Script
 
 main! = |_args| {
+	Script.command("roc-policy").run!(["check", "--root", "."].map(OsStr.from_str))?
 	check_tooling!()?
 	check_platform!()?
 	run_script!("scripts/build_platform.roc", [])?
@@ -34,6 +35,11 @@ check_tooling! = || {
 			stable.run!([OsStr.from_str("check"), Path.to_os_str(path)])?
 		}
 	}
+	for path in script_files {
+		if Path.read_utf8!(path)?.contains("\nexpect ") {
+			stable.run!([OsStr.from_str("test"), Path.to_os_str(path)])?
+		}
+	}
 	Ok({})
 }
 
@@ -42,6 +48,7 @@ check_platform! = || {
 	roc = Script.roc!()?
 	roc.run!(["fmt", "--check", "platform", "examples"].map(OsStr.from_str))?
 	roc.run!(["check", "platform/main.roc"].map(OsStr.from_str))?
+	roc.run!(["test", "platform/main.roc"].map(OsStr.from_str))?
 	for path in Files.roc_files!(Path.utf8("examples"))? {
 		if Path.read_utf8!(path)?.contains("\nexpect ") {
 			roc.run!([OsStr.from_str("test"), Path.to_os_str(path)])?

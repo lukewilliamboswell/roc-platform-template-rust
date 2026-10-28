@@ -1,0 +1,8 @@
+profile = {
+ schema_version: 2, 
+ rules: [
+ { id: "product/no-pin", kind: NoCompilerPin, include: ["platform/**/*.roc", "examples/**/*.roc"] },
+ { id: "tooling/pin", kind: CompilerPin, include: ["scripts/**/*.roc"], value: "nightly-2026-10-25-72704da" },
+ { id: "examples/platform", kind: Dependency, include: ["examples/**/main.roc"], name: "pf", value: "../../platform/main.roc" },
+ ],
+}

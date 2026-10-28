@@ -76,7 +76,7 @@ run_suite! = |suite| {
 			$failures = $failures.append("${example.path}: roc check exited ${check.to_str()}, roc build exited ${build.to_str()}")
 		} else {
 			for test_case in example.cases {
-				output = Script.command(Path.to_os_str(exe)).base.args(test_case.args.map(OsStr.from_str)).stdin(Bytes(test_case.stdin.to_utf8())).run!().map_err(|err| CaseRunFailed(example.path, err))?
+				output = Script.command(Path.to_os_str(exe)).base.args(test_case.args.map(OsStr.from_str)).stdin(Bytes(test_case.stdin.to_utf8())).timeout_ms(10_000).output_limit(10_000_000).manage_tree(Bool.True).run!().map_err(|err| CaseRunFailed(example.path, err))?
 				code = match output.status {
 					Exited(value) => value
 					Signaled(_) => -1
