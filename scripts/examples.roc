@@ -17,6 +17,7 @@ app [main!] {
 ##   test     run a suite (working tree or --archive) against --bundle served
 ##            from loopback, with an empty package cache
 
+import cli.Duration
 import cli.Env
 import cli.OsStr
 import cli.Path
@@ -67,6 +68,7 @@ run_suite! = |suite| {
 	build_dir = Path.join(suite, ".examples-build")
 	Path.create_all!(build_dir)?
 	var $failures = []
+	var $tested = 0u64
 	for example in spec.apps {
 		source = Path.join(suite, example.path)
 		exe = Path.join(build_dir, example.path.replace_each("/", "_").replace_last(".roc", ""))
@@ -76,7 +78,9 @@ run_suite! = |suite| {
 			$failures = $failures.append("${example.path}: roc check exited ${check.to_str()}, roc build exited ${build.to_str()}")
 		} else {
 			for test_case in example.cases {
-				output = Script.command(Path.to_os_str(exe)).base.args(test_case.args.map(OsStr.from_str)).stdin(Bytes(test_case.stdin.to_utf8())).timeout_ms(10_000).output_limit(10_000_000).manage_tree(Bool.True).run!().map_err(|err| CaseRunFailed(example.path, err))?
+				$tested = $tested + 1
+				Script.info!("CASE", "${$tested.to_str()}: ${example.path} [${test_case.name}]")?
+				output = Script.command(Path.to_os_str(exe)).base.args(test_case.args.map(OsStr.from_str)).stdin(Bytes(test_case.stdin.to_utf8())).timeout(Duration.seconds(10)).output_limit(MaxBytes(10_000_000)).manage_tree(Bool.True).run!().map_err(|err| CaseRunFailed(example.path, err))?
 				code = match output.status {
 					Exited(value) => value
 					Signaled(_) => -1
@@ -92,6 +96,7 @@ run_suite! = |suite| {
 			}
 		}
 	}
+	Script.info!("SUMMARY", "${$tested.to_str()} cases executed; ${$failures.len().to_str()} failures; 0 skipped")?
 	if $failures.is_empty() {
 		Script.pass!("All example cases passed.")
 	} else {

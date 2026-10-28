@@ -45,3 +45,5 @@ dist/
 platform/runtime/
 .examples-build/
 .blueprint/
+
+.docs-out/
