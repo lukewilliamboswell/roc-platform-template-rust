@@ -54,6 +54,7 @@ The manual is available as HTML, PDF and static Markdown under `manual/`.
 The shared platform release adapter is tracked in
 https://github.com/lukewilliamboswell/roc-automation/issues/100[roc-automation#100].
 Until it supports native bundle contents, this repository retains a small
-platform-specific adapter. Intel native validation and linker-input SBOM
-publication are disabled or explicitly incomplete pending their upstream issues,
-linked from https://github.com/lukewilliamboswell/roc-automation/issues/62[roc-automation#62].
+platform-specific adapter. Intel native validation remains disabled pending
+https://github.com/lukewilliamboswell/roc-automation/issues/101[roc-automation#101].
+Linker-input SBOM publication remains incomplete pending
+https://github.com/lukewilliamboswell/roc-automation/issues/62[roc-automation#62].

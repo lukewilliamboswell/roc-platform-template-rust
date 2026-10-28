@@ -34,5 +34,5 @@ The Rust host owns allocation, process I/O and the generated ABI boundary.
 Every host is stored at `platform/targets/<target>/libhost.a` in the bundle.
 Cross-compilation is evidence that the host compiles; it does not establish
 native execution. Do not interpret the compatibility badge as Intel macOS
-validation. See the upstream TODO in the repository's adoption tracking issue
-https://github.com/lukewilliamboswell/roc-platform-template-rust/issues/64[#64].
+validation. Native coverage is tracked in
+https://github.com/lukewilliamboswell/roc-automation/issues/101[roc-automation#101].
