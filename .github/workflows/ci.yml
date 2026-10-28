@@ -80,6 +80,7 @@ jobs:
         run: python3 -m unittest discover -s ci -p 'test_*.py' -v
 
   required:
+    name: CI required
     if: always()
     needs: [check, runtime-tests]
     runs-on: ubuntu-24.04
