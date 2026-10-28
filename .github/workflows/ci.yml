@@ -155,8 +155,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Linker-input tooling tests
-        run: python3 -m unittest discover -s ci -p 'test_*.py' -v
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          install-nix: 'true'
+      - name: Linker-input archive admission regressions
+        run: blueprint run runtime-cli-tests
 
   required:
     name: CI required
