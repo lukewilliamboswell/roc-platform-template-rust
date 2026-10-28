@@ -2,16 +2,16 @@
   "schema_version": 1,
   "kind": "link-inputs",
   "repository": "lukewilliamboswell/roc-platform-template-rust",
-  "release": "linker-inputs-sha256-cd3fcbe71b125e036c5d47826db63290ffb4b87b42b679d8c566531b90202bde",
+  "release": "linker-inputs-sha256-ee606310ae32faf75c8fb1be644ec56526d7a9edb8d7591c39251e630f4155d9",
   "manifest": {
     "asset": "build-input-release.json",
-    "sha256": "cd3fcbe71b125e036c5d47826db63290ffb4b87b42b679d8c566531b90202bde"
+    "sha256": "ee606310ae32faf75c8fb1be644ec56526d7a9edb8d7591c39251e630f4155d9"
   },
   "source": {
-    "input_fingerprint": "9161faaf9285145a2722de7d7eea4590fbeef862178c059b22f41f0540b406de",
-    "ref": "refs/heads/adopt/content-addressed-linker-inputs",
+    "input_fingerprint": "a4d3e726e6cfb7c85eb12eb8ae6f3c4a59a6258ddacff3278b09edc89b5600c1",
+    "ref": "refs/heads/automation/full-adoption",
     "repository": "lukewilliamboswell/roc-platform-template-rust",
-    "sha": "ca38f4e9f2a99def3f1099836f839c849aadce15",
+    "sha": "ca25d44325f0d6fd535592bb7717bfdbcf7de36a",
     "workflow": "lukewilliamboswell/roc-platform-template-rust/.github/workflows/runtime-release.yml"
   },
   "targets": {
