@@ -54,9 +54,14 @@ check_tooling! = || {
 	for path in Files.direct_files!(Path.utf8("scripts"))? {
 		if Path.ext(path).map_ok(Path.display) == Ok("roc") {
 			stable.run!([OsStr.from_str("check"), Path.to_os_str(path)])?
+			dependencies = stable.capture!([OsStr.from_str("deps"), Path.to_os_str(path)], Path.utf8("."), [])?
+			for url in dependency_urls(Str.from_utf8_lossy(dependencies)) {
+				Script.require!(Path.read_utf8!(Path.utf8("Blueprint.roc"))?.contains(Json.to_str(url)), "Undeclared script dependency: ${url}")?
+			}
 		}
 	}
 	stable.run!(["test", "scripts/tooling_tests.roc"].map(OsStr.from_str))?
+	stable.run!(["test", "scripts/check_all.roc"].map(OsStr.from_str))?
 	Ok({})
 }
 
@@ -94,3 +99,8 @@ check_worktree! = || {
 }
 
 run_script! = |script, args| Script.roc_stable!()?.run!([script, "--"].concat(args).map(OsStr.from_str))
+
+dependency_urls = |tree| tree.split_on("\n").join_map(|line| line.split_on(" ").keep_if(|word| word.starts_with("https://")))
+
+expect dependency_urls("tree\n├── https://example.org/a.tar.zst [platform]\n│   └── https://example.org/b.tar.zst") == ["https://example.org/a.tar.zst", "https://example.org/b.tar.zst"]
+expect dependency_urls("no dependencies") == []

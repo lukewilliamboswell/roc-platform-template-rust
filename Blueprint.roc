@@ -30,6 +30,7 @@ config = [
 			Command("roc-stable", "nix#rocpkgs.nightly-2026-10-25-72704da"),
 			# Every bundle the scripts depend on: `roc-stable deps scripts/check_all.roc`.
 			RocPackages([
+				"https://github.com/roc-lang/http/releases/download/1.0.0/6ZUwqYhCS8PU9Mo6MF7oV82ET2o7KYb57CLKDq4cq4sS.tar.zst",
 				"https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
 				"https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
 				"https://github.com/lukewilliamboswell/weaver/releases/download/0.9.0/7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77.tar.zst",
@@ -50,7 +51,7 @@ config = [
 	Task("runtime-build", [Use("dev"), Run(["scripts/runtime_build.roc", "--"])]),
 	Task("release-evidence-test", [Use("dev"), Run(["python3", "tests/test_release_evidence.py", "--"])]),
 	Task("runtime", [Use("dev"), Run(["scripts/runtime.roc", "--"])]),
-	Task("runtime-cli-tests", [Use("dev"), Run(["python3", "-m", "unittest", "discover", "-s", "tests", "-p", "test_runtime_cli.py", "-v"])]),
+	Task("runtime-cli-tests", [Use("dev"), Run(["python3", "-m", "unittest", "discover", "-s", "tests", "-p", "test_runtime*.py", "-v"])]),
 	Task("runtime-test", [Use("dev"), Run(["scripts/runtime_test.roc", "--"])]),
 	Task("tooling-tests", [Use("dev"), Run(["roc-stable", "test", "scripts/tooling_tests.roc"])]),
 	Task("test-driver", [Use("dev"), Run(["python3", "tests/test_examples_driver.py"])]),
