@@ -6,10 +6,12 @@ app [main!] {
 
 import cli.OsStr
 import cli.Path
+import cli.Stdout
 import src/Runtime
 
 ## Fetch selected locked target archives, or inspect/install a local candidate.
 main! = |args| match args.map(OsStr.display) {
+	["fingerprint"] => Stdout.line!(Runtime.fingerprint!()?)
 	["fetch", .. as rest] => Runtime.fetch!(parse_targets(rest)?)
 	["inspect", archive, target] => {
 		_ = Runtime.inspect!(Path.utf8(archive), target)?

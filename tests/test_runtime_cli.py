@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -101,6 +102,155 @@ class RuntimeArchiveTests(unittest.TestCase):
 
     def test_wrong_source_pin_fails(self):
         self.verdict(lambda manifest, members: manifest['source'].__setitem__('sha256', '0' * 64))
+
+    def install_candidate(self, prepare=None, mutate=None):
+        temporary = tempfile.TemporaryDirectory()
+        root = Path(temporary.name)
+        (root / 'runtime').mkdir()
+        (root / 'runtime/source.json').write_bytes((ROOT / 'runtime/source.json').read_bytes())
+        archive = self.archive(root, mutate=mutate, combined=True)
+        if prepare:
+            prepare(root)
+        run = subprocess.run([BINARY, 'install-candidate', str(archive)], cwd=root,
+                             capture_output=True, timeout=20)
+        return temporary, root, run
+
+    def test_install_validates_every_member_before_writing(self):
+        temp, root, run = self.install_candidate(
+            mutate=lambda manifest, members: manifest['files'].__setitem__(members[-1][0], '0' * 64))
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertFalse((root / 'platform').exists())
+
+    def test_install_rejects_symlinked_platform(self):
+        def prepare(root):
+            (root / 'outside').mkdir()
+            (root / 'platform').symlink_to(root / 'outside', target_is_directory=True)
+        temp, root, run = self.install_candidate(prepare=prepare)
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertEqual(list((root / 'outside').iterdir()), [])
+
+    def test_install_rejects_symlinked_target_parent(self):
+        def prepare(root):
+            (root / 'outside').mkdir()
+            (root / 'platform/targets').mkdir(parents=True)
+            (root / 'platform/targets/x64musl').symlink_to(root / 'outside', target_is_directory=True)
+        temp, root, run = self.install_candidate(prepare=prepare)
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertEqual(list((root / 'outside').iterdir()), [])
+
+    def test_successful_install_writes_only_declared_files(self):
+        temp, root, run = self.install_candidate()
+        with temp:
+            self.assertEqual(run.returncode, 0, run.stderr.decode(errors='replace'))
+            expected = {f'targets/{target}/{name}' for target in ('x64musl', 'arm64musl') for name in LIBRARIES}
+            expected.update(f'runtime/{name}' for name in LICENSES)
+            expected.add('runtime/manifest.json')
+            actual = {str(path.relative_to(root / 'platform'))
+                      for path in (root / 'platform').rglob('*') if path.is_file()}
+            self.assertEqual(actual, expected)
+
+    def fetch_fixture(self, corrupt=False, broken_download=False, mutate_lock=None, symlink=False, dirty_producer=False):
+        temporary = tempfile.TemporaryDirectory()
+        root = Path(temporary.name)
+        checkout = root / 'checkout'
+        subprocess.run(['git', 'clone', '--quiet', '--local', '--shared', str(ROOT), str(checkout)],
+                       check=True, capture_output=True, timeout=20)
+        fingerprint = subprocess.run([BINARY, 'fingerprint'], cwd=checkout, capture_output=True,
+                                     check=True, timeout=20).stdout.decode().strip()
+        archive = self.archive(root)
+        data = archive.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        cache = root / 'cache'
+        cache.mkdir()
+        cached = cache / digest
+        if symlink:
+            cached.symlink_to(archive)
+        else:
+            cached.write_bytes(b'x' * len(data) if corrupt else data)
+        record = {'asset': 'link-inputs-x64musl.tar', 'sha256': digest, 'size': len(data)}
+        lock = {'schema_version': 1, 'kind': 'link-inputs',
+                'repository': 'lukewilliamboswell/roc-platform-template-rust',
+                'release': 'linker-inputs-sha256-' + '0' * 64,
+                'manifest': {'asset': 'build-input-release.json', 'sha256': '0' * 64},
+                'source': {'repository': 'lukewilliamboswell/roc-platform-template-rust',
+                           'sha': '1' * 40, 'ref': 'refs/heads/fixture',
+                           'workflow': 'lukewilliamboswell/roc-platform-template-rust/.github/workflows/runtime-release.yml',
+                           'input_fingerprint': fingerprint},
+                'targets': {'x64musl': record, 'arm64musl': dict(record, asset='link-inputs-arm64musl.tar')}}
+        if mutate_lock:
+            mutate_lock(lock)
+        (checkout / 'runtime/link-inputs.lock.json').write_text(json.dumps(lock))
+        if dirty_producer:
+            source = checkout / 'runtime/source.json'
+            source.write_text(source.read_text() + '\n')
+        tools = root / 'bin'
+        tools.mkdir()
+        curl = tools / 'curl'
+        curl.write_text('#!' + sys.executable + '\n' +
+                        "import os, pathlib, shutil, sys\n" +
+                        "pathlib.Path(os.environ['FAKE_CURL_LOG']).write_text('\\n'.join(sys.argv[1:]))\n" +
+                        "shutil.copyfile(os.environ['FAKE_CURL_SOURCE'], sys.argv[sys.argv.index('--output') + 1])\n")
+        curl.chmod(0o755)
+        if broken_download:
+            archive.write_bytes(b'broken download')
+        log = root / 'curl.log'
+        env = dict(os.environ, ROC_LINK_INPUT_CACHE=str(cache), FAKE_CURL_LOG=str(log),
+                   FAKE_CURL_SOURCE=str(archive), PATH=str(tools) + os.pathsep + os.environ['PATH'])
+        run = subprocess.run([BINARY, 'fetch', '--target', 'x64musl'], cwd=checkout,
+                             env=env, capture_output=True, timeout=20)
+        return temporary, checkout, cache, digest, log, run
+
+    def test_verified_cache_hit_needs_no_network(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture()
+        with temp:
+            self.assertEqual(run.returncode, 0, run.stderr.decode(errors='replace'))
+            self.assertFalse(log.exists())
+            self.assertTrue((checkout / 'platform/targets/x64musl/libc.a').is_file())
+
+    def test_same_size_corrupt_cache_is_rehashed_and_downloaded_exactly(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture(corrupt=True)
+        with temp:
+            self.assertEqual(run.returncode, 0, run.stderr.decode(errors='replace'))
+            self.assertEqual(hashlib.sha256((cache / digest).read_bytes()).hexdigest(), digest)
+            self.assertIn('https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/' +
+                          'linker-inputs-sha256-' + '0' * 64 + '/link-inputs-x64musl.tar', log.read_text())
+
+    def test_wrong_download_digest_fails_and_removes_cache(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture(corrupt=True, broken_download=True)
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertTrue(log.exists())
+            self.assertFalse((cache / digest).exists())
+            self.assertFalse((checkout / 'platform/targets/x64musl/libc.a').exists())
+
+    def test_stale_fingerprint_fails_without_network(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture(
+            mutate_lock=lambda lock: lock['source'].__setitem__('input_fingerprint', '0' * 64))
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertFalse(log.exists())
+
+    def test_uncommitted_producer_changes_fail_without_network(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture(dirty_producer=True)
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertFalse(log.exists())
+
+    def test_wrong_producer_identity_fails_without_network(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture(
+            mutate_lock=lambda lock: lock['source'].__setitem__('workflow', 'wrong'))
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertFalse(log.exists())
+
+    def test_symlink_cache_entry_fails_without_network(self):
+        temp, checkout, cache, digest, log, run = self.fetch_fixture(symlink=True)
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertFalse(log.exists())
 
     def test_unsupported_schema_fails(self):
         self.verdict(lambda manifest, members: manifest.__setitem__('schema_version', 99))

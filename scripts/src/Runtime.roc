@@ -55,9 +55,16 @@ Runtime := [].{
 		}
 	}
 
+	valid_ref = |value| value.starts_with("refs/heads/") and !value.drop_prefix("refs/heads/").is_empty() and !value.contains("..") and value.to_utf8().all(|byte| (byte >= 'a' and byte <= 'z') or (byte >= 'A' and byte <= 'Z') or (byte >= '0' and byte <= '9') or ['.', '_', '/', '-'].contains(byte))
+
 	hex = |value, len| value.to_utf8().len() == len and value.to_utf8().all(|byte| (byte >= '0' and byte <= '9') or (byte >= 'a' and byte <= 'f'))
 
 	fingerprint! = || {
+		for name in producer_inputs {
+			require!(Path.is_file!(Path.utf8(name))? and !Path.is_sym_link!(Path.utf8(name))?, "Producer input must be a regular file: ${name}")?
+		}
+		clean = command!(["git", "diff", "--quiet", "HEAD", "--"].concat(producer_inputs), [])?
+		require!(clean.status == Exited(0), "Uncommitted linker-input producer changes; commit and run the trusted publisher")?
 		var $lines = ""
 		for name in producer_inputs {
 			blob = run!(["git", "rev-parse", "HEAD:${name}"])?.trim()
@@ -145,7 +152,7 @@ Runtime := [].{
 		lock : Lock
 		lock = Json.parse(Str.from_utf8_lossy(renamed.stdout_bytes))?
 		require!(lock.schema_version == 1 and lock.kind == "link-inputs" and lock.repository == repository and lock.release == "linker-inputs-sha256-${lock.manifest.sha256}" and lock.manifest.asset == "build-input-release.json" and hex(lock.manifest.sha256, 64), "Unsupported linker-input lock identity")?
-		require!(lock.source.repository == repository and lock.source.workflow == "${repository}/${workflow}" and hex(lock.source.sha, 40) and lock.source.ref.starts_with("refs/heads/") and !lock.source.ref.contains(".."), "Invalid linker-input producer identity")?
+		require!(lock.source.repository == repository and lock.source.workflow == "${repository}/${workflow}" and hex(lock.source.sha, 40) and valid_ref(lock.source.ref), "Invalid linker-input producer identity")?
 		require!(lock.source.input_fingerprint == fingerprint!()?, "Linker-input producer inputs changed; publish and adopt a new content lock")?
 		home = Env.var_str!("HOME")?
 		cache = Path.utf8(
@@ -190,3 +197,8 @@ expect !Runtime.valid_members(["../a"], ["a"])
 expect !Runtime.valid_members(["a", "b"], ["a"])
 expect Runtime.hex("abc012", 6)
 expect !Runtime.hex("ABC012", 6)
+
+expect Runtime.valid_ref("refs/heads/feature/native-inputs")
+expect !Runtime.valid_ref("refs/heads/")
+expect !Runtime.valid_ref("refs/heads/main\n")
+expect !Runtime.valid_ref("refs/heads/../main")
