@@ -70,6 +70,16 @@
     "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
   },
   {
+    "input": "roc-package:6ZUwqYhCS8PU9Mo6MF7oV82ET2o7KYb57CLKDq4cq4sS",
+    "component": "",
+    "reason": "Transitive source-tooling dependency; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "roc-package:7YfABZPwJAXtLBY2vm8FqMyGAtNxncCJ65HdNKHFGNnE",
+    "component": "",
+    "reason": "Transitive source-tooling dependency; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
     "input": "roc-package:7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77",
     "component": "",
     "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
