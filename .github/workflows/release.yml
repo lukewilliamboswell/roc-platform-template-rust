@@ -197,7 +197,7 @@ jobs:
         with:
           version: nightly-new-compiler
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
@@ -233,7 +233,7 @@ jobs:
       id-token: write
     steps:
       # No checkout, candidate executable, Blueprint task or repository script.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
@@ -253,7 +253,7 @@ jobs:
     steps:
       # The shared publisher handles these inert files with its own reviewed
       # tooling: stage draft, upload, download/hash-verify, then publish once.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
