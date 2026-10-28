@@ -110,7 +110,7 @@ jobs:
           bundle=$(basename "${bundles[0]}")
           blueprint run examples -- --operation package --release-version 0.0.1-dryrun --platform-url "https://github.com/$REPOSITORY/releases/download/0.0.1-dryrun/$bundle" --output dist/roc-platform-template-rust-examples-0.0.1-dryrun.zip
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ci-bundle
           path: dist/
