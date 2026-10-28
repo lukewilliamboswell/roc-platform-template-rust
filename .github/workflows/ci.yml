@@ -106,7 +106,7 @@ jobs:
           bundles=(dist/*.tar.zst)
           test "${#bundles[@]}" = 1
           bundle=$(basename "${bundles[0]}")
-          blueprint run examples -- --operation package --release-version 0.0.0-dryrun --platform-url "https://github.com/$REPOSITORY/releases/download/0.0.0-dryrun/$bundle" --output dist/examples.zip
+          blueprint run examples -- --operation package --release-version 0.0.1-dryrun --platform-url "https://github.com/$REPOSITORY/releases/download/0.0.1-dryrun/$bundle" --output dist/roc-platform-template-rust-examples-0.0.1-dryrun.zip
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -143,7 +143,7 @@ jobs:
       - name: Execute archived examples against the exact bundle
         env:
           BUNDLE: ${{ needs.build.outputs.bundle }}
-        run: blueprint run examples -- --operation test --archive dist/examples.zip --bundle "dist/$BUNDLE"
+        run: blueprint run examples -- --operation test --archive dist/roc-platform-template-rust-examples-0.0.1-dryrun.zip --bundle "dist/$BUNDLE"
 
   runtime-tests:
     runs-on: ubuntu-24.04

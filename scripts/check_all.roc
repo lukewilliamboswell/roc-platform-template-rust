@@ -52,11 +52,7 @@ check_tooling! = || {
 			stable.run!([OsStr.from_str("check"), Path.to_os_str(path)])?
 		}
 	}
-	for path in script_files {
-		if Path.read_utf8!(path)?.contains("\nexpect ") {
-			stable.run!([OsStr.from_str("test"), Path.to_os_str(path)])?
-		}
-	}
+	stable.run!(["test", "scripts/tooling_tests.roc"].map(OsStr.from_str))?
 	Ok({})
 }
 
