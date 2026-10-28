@@ -80,7 +80,9 @@ jobs:
         id: host
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
-          path: platform/targets/*/libhost.a
+          path: |
+            platform/targets/*/libhost.a
+            platform/targets/*/libhost.a.sha256
           key: host-${{ runner.os }}-${{ steps.host-key.outputs.key }}
       - name: Restore content-addressed linker inputs
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809

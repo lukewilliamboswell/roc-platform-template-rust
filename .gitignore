@@ -47,3 +47,5 @@ platform/runtime/
 .blueprint/
 
 .docs-out/
+
+platform/targets/*/libhost.a.sha256
