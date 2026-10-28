@@ -26,6 +26,17 @@
           "stdout": "Hello Roc!\nArgs: \n",
           "stderr": "",
           "exit_code": 0
+        },
+        {
+          "name": "with-args",
+          "args": [
+            "one",
+            "two"
+          ],
+          "stdin": "",
+          "stdout": "Hello Roc!\nArgs: one, two\n",
+          "stderr": "",
+          "exit_code": 0
         }
       ]
     },
@@ -114,7 +125,7 @@
           "name": "default",
           "args": [],
           "stdin": "",
-          "stdout": "match no extra args: no\nmatch extra args: no\n",
+          "stdout": "match no extra args: yes\nmatch extra args: no\n",
           "stderr": "",
           "exit_code": 0
         }

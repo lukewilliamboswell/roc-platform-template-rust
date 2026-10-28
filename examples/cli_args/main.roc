@@ -6,7 +6,8 @@ main! : List(Str) => Try({}, [Exit(I32), StdoutErr(Str)])
 main! = |args| {
 	Stdout.line!("Hello Roc!")?
 
-	args_str = Str.join_with(args, ", ")
+	# The first argument is the program name; the rest are the user's.
+	args_str = Str.join_with(args.drop_first(1), ", ")
 	Stdout.line!("Args: ${args_str}")?
 
 	Ok({})
