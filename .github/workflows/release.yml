@@ -130,7 +130,9 @@ jobs:
           test "${#bundles[@]}" = 1
           echo "filename=$(basename "${bundles[0]}")" >> "$GITHUB_OUTPUT"
       - name: Build the manual
-        run: blueprint run docs
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: blueprint run docs -- --docs-version "$VERSION"
       - name: Package examples, API archive and authored release notes
         env:
           VERSION: ${{ needs.validate.outputs.version }}
