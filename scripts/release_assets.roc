@@ -25,7 +25,7 @@ main! = |args| {
 		Run(value) => value
 		Exit => return Ok({})
 	}
-	Script.require!(ReleaseArtifacts.valid_version(options.release_version), "release-assets needs --version MAJOR.MINOR.PATCH or 0.0.1-dryrun")?
+	Script.require!(ReleaseArtifacts.valid_version(options.release_version), "release-assets needs --release-version MAJOR.MINOR.PATCH or 0.0.1-dryrun")?
 	Script.require!(ReleaseArtifacts.safe_name(options.bundle) and options.bundle.ends_with(".tar.zst"), "--bundle must be a bundle filename")?
 	output = Path.absolute!(Path.utf8(options.output_dir))?
 	Path.create_all!(output)?

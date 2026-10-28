@@ -1,4 +1,5 @@
 import cli.Cmd
+import cli.Duration
 import cli.Env
 import cli.OsStr
 import cli.Path
@@ -30,7 +31,7 @@ Script := [].{
 		cmd = |self, args| self.base.args(args)
 	}
 
-	command = |program| Command.{ base: Cmd.new(program), program }
+	command = |program| Command.{ base: Cmd.new(program).timeout(Duration.seconds(600)).manage_tree(Bool.True), program }
 
 	## A command that sees only the named environment variables, each with the
 	## value this process has. A compiler run this way cannot pick anything up
@@ -46,7 +47,7 @@ Script := [].{
 				Err(err) => return Err(EnvironmentInputError(OsStr.display(name), err))
 			}
 		}
-		Ok(Command.{ base: Cmd.new(program).clear_envs().envs($kept), program })
+		Ok(Command.{ base: Cmd.new(program).clear_envs().envs($kept).timeout(Duration.seconds(600)).manage_tree(Bool.True), program })
 	}
 
 	## The tooling compiler that Blueprint.roc names. It runs the scripts and

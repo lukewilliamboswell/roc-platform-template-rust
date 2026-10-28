@@ -66,5 +66,7 @@ blueprint run examples
 blueprint run examples -- --operation test --archive <examples.zip> --bundle <bundle.tar.zst>
 ----
 
-A timeout, missing result or skipped case does not establish compatibility.
+Tooling and compiler commands have a ten-minute safety deadline; individual
+example processes have ten seconds. A timeout, missing result or skipped case
+does not establish compatibility.
 Inspect retained diagnostics on successful as well as failed compiler calls.
