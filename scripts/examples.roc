@@ -68,7 +68,7 @@ run_suite! = |suite| {
 	build_dir = Path.join(suite, ".examples-build")
 	Path.create_all!(build_dir)?
 	var $failures = []
-	var $tested = 0u64
+	var $tested = 0.U64
 	for example in spec.apps {
 		source = Path.join(suite, example.path)
 		exe = Path.join(build_dir, example.path.replace_each("/", "_").replace_last(".roc", ""))

@@ -23,7 +23,10 @@ config = [
 		"dev",
 		[
 			Overlays(["roc", "zig", "rust"]),
- Programs([Fetch("roc-policy", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-policy-{system}"))]),
+			Programs([
+				Fetch("roc-policy", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-policy-{system}")),
+				Fetch("blueprint-sbom", Recipes.file("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.8.0/blueprint-sbom-{system}")),
+			]),
 			Command("roc-stable", "nix#rocpkgs.nightly-2026-10-25-72704da"),
 			# Every bundle the scripts depend on: `roc-stable deps scripts/check_all.roc`.
 			RocPackages([
@@ -36,7 +39,7 @@ config = [
 		],
 	),
 	Environment("docs", [Programs([Fetch("roc-docs", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-docs-{system}"))])]),
-	Task("docs", [Use("docs"), Run(["roc-docs", "build", "--workspace", ".", "--output-directory", ".docs-out/manual", "--pdf-filename", "roc-platform-template-rust.pdf", "--site-url", "https://lukewilliamboswell.github.io/roc-platform-template-rust/"])]),
+	Task("docs", [Use("docs"), Run(["roc-docs", "build", "--workspace", ".", "--output-directory", ".docs-out/manual", "--pdf-filename", "roc-platform-template-rust.pdf", "--site-url", "https://lukewilliamboswell.github.io/roc-platform-template-rust/manual/"])]),
 	Task("docs-path", [Use("docs"), Run(["sh", "-c", "realpath \"$(command -v roc-docs)\""])]),
 	Task("docs-site", [Use("dev"), Run(["scripts/docs_site.roc", "--"])]),
 	Task("prepare-sbom", [Use("dev"), Run(["scripts/prepare_sbom.roc", "--"])]),
@@ -44,8 +47,10 @@ config = [
 	Shell("default", [Use("dev")]),
 	Task("bindings", [Use("dev"), Run(["scripts/bindings.roc", "--"])]),
  Task("host-fingerprint", [Use("dev"), Run(["scripts/host_fingerprint.roc", "--"])]),
- Task("policy", [Use("dev"), Run(["roc-policy", "check", "--root", "."])]),
+ Task("test-driver", [Use("dev"), Run(["python3", "tests/test_examples_driver.py"])]),
+	Task("policy", [Use("dev"), Run(["roc-policy", "check", "--root", "."])]),
 	Task("check", [Use("dev"), Run(["scripts/check_all.roc"])]),
+	Task("check-source", [Use("dev"), Run(["scripts/check_all.roc", "--", "--static-only"])]),
 	Task("build-platform", [Use("dev"), Run(["scripts/build_platform.roc", "--"])]),
 	Task("bundle", [Use("dev"), Run(["scripts/bundle.roc", "--"])]),
 	Task("examples", [Use("dev"), Run(["scripts/examples.roc", "--"])]),
