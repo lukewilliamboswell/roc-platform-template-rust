@@ -1,0 +1,10 @@
+= 1.2.0
+
+This release removes product compiler pins and makes downloaded example archives
+use the exact published platform bundle. Daily compatibility validates the
+published examples against the latest nightly on Linux x86_64, Linux ARM64 and
+Apple Silicon macOS. Committed examples instead follow the working tree.
+
+The original immutable release has no documentation archive or product SBOM
+sidecars. Reconstructed API documentation is labelled as such and does not
+change the release's original asset inventory.

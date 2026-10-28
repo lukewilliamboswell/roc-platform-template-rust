@@ -1,0 +1,66 @@
+= Contribute to the platform
+
+[#contribute]
+== Contribute
+
+Report a reproducible bug or propose a change through the
+https://github.com/lukewilliamboswell/roc-platform-template-rust/issues[issue tracker].
+For a bug, include the operating system, target, `roc version`, the platform
+release or source commit, the command and its output. Report security concerns
+through xref:security.adoc#report-a-vulnerability[the private channel].
+
+Open a pull request from current main. Keep commits focused and signed. Run
+`blueprint run check` before review; CI also tests the exact release candidate
+archives. Changes to behavior need meaningful tests, including error cases.
+
+== Tooling and product compilers
+
+Blueprint declares the tools and native toolchains; its lock records the
+reviewed inputs. `roc-stable` runs source automation under `scripts/`. Its tag
+matches those scripts' header fields. The plain `roc` on your PATH checks,
+tests and bundles the product with the current nightly. Product source and
+examples carry no compiler pin.
+
+When updating tooling, change the Blueprint setting and affected script pins
+together. Format source scripts with `roc-stable fmt`; format platform source
+and examples with `roc fmt`. Never refresh a lock merely to silence a failure:
+review the selected dependency identities.
+
+== Build and bundle
+
+[source,sh]
+----
+blueprint run build-platform -- --target all
+blueprint run bundle -- --output-dir dist
+----
+
+The first task cross-compiles the host and installs hash-verified linker inputs.
+The second assembles the bundle without rebuilding native code. For local
+validation, `--target native` builds or bundles only the machine's target.
+Generated hosts, bundles and documentation are not committed.
+
+== Update host bindings
+
+Bindings in `src/roc_platform_abi.rs` are committed and consumed by host builds.
+The bindings check regenerates them using the selected nightly's verified
+source specification and compares them with the committed file. An interface
+change requires reviewing both the generated diff and matching host changes.
+Use the bindings task's explicit update operation, then build and run the
+examples on all supported runners. A stale binding must fail CI; host builds
+must not silently regenerate it.
+
+== Test the interface
+
+`blueprint run check` covers formatting, source policy, unit tests, working-tree
+examples and examples against a loopback-served bundle. `tests/spec.json`
+records arguments, input, exact output and exit status. A check never rewrites
+expectations. Review explicit expectation updates as behavior changes.
+
+[source,sh]
+----
+blueprint run examples
+blueprint run examples -- --operation test --archive <examples.zip> --bundle <bundle.tar.zst>
+----
+
+A timeout, missing result or skipped case does not establish compatibility.
+Inspect retained diagnostics on successful as well as failed compiler calls.

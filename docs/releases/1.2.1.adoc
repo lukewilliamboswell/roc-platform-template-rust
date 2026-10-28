@@ -1,0 +1,10 @@
+= 1.2.1 (unreleased)
+
+This maintenance release strengthens source-policy checks, generated binding
+validation and release evidence. It retains the platform interface and example
+paths. Product release inventories describe the delivered files and retain
+explicit missing supplier coverage.
+
+The manual brings build, contribution, release and security instructions into
+one place. Intel macOS remains cross-compiled only; the native compatibility
+result covers Linux x86_64, Linux ARM64 and Apple Silicon macOS.

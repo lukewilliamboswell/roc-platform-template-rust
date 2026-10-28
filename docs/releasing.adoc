@@ -1,0 +1,59 @@
+= Publish and maintain a release
+
+== Prepare a version
+
+A platform version is independent of the compiler version. Compare the changed
+public interface with the latest bundle using `roc bump`, and choose a version
+that is large enough for the change. Author `docs/releases/<version>.adoc`
+before dispatching the release. Explain user-visible changes and any migration,
+not just a list of merged commits.
+
+Dispatch Release from main with the unprefixed version. The workflow validates
+the version and notes, runs checks, builds or restores the hosts, bundles once,
+and tests the exact archived examples against the exact bundle with a clean
+package cache on every supported runner.
+
+== Publish the tested files
+
+Generation and validation run with read-only permissions. The protected
+`release` environment permits publication from main only. Its publisher treats
+artifacts as inert bytes: stage a draft, upload the explicit asset set, download
+and verify names, sizes and hashes, then publish once. Privileged jobs never
+execute candidate source or build scripts.
+
+A release retains its platform bundle, frozen examples, API documentation
+archive, manual PDF, checksums, artifact-bound SBOM sidecars and available
+attestation evidence. Notes identify the source commit and product/tooling
+compilers. Coverage gaps remain explicit in the inventories.
+
+== Recover an interrupted publication
+
+If publication fails before a release is public, inspect the draft and the run's
+evidence. Delete the failed draft before retrying the supported publisher path;
+do not publish it by hand. Never move a version tag, replace assets or repair a
+published immutable release. Changed software bytes require a new version.
+
+A corrected SBOM uses a new immutable location and document revision bound to
+the unchanged software digest, with links to the retained original.
+
+== Compatibility and documentation
+
+Nightly compatibility tests the latest published examples against the latest
+compiler. A failing release is fixed with a new platform release, not by editing
+its archive. A diagnostic run naming historical versions must not close a
+tracking issue for the latest pair.
+
+The site leads with the latest final release's API and example archive.
+Development documentation is labelled unreleased. Releases before documentation
+archives existed can have reconstructed documentation labelled with their exact
+source/compiler identity; reconstruction never adds assets to an old release.
+The manual is available as HTML, PDF and static Markdown under `manual/`.
+
+== Deferred shared-tooling work
+
+The shared platform release adapter is tracked in
+https://github.com/lukewilliamboswell/roc-automation/issues/100[roc-automation#100].
+Until it supports native bundle contents, this repository retains a small
+platform-specific adapter. Intel native validation and linker-input SBOM
+publication are disabled or explicitly incomplete pending their upstream issues,
+linked from https://github.com/lukewilliamboswell/roc-automation/issues/62[roc-automation#62].
