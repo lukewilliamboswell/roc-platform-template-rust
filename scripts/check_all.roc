@@ -12,12 +12,22 @@ import cli.Env
 import cli.OsStr
 import cli.Path
 import src/Files
+import src/RocSource
 import src/Script
 
-main! = |_args| {
+main! = |args| {
+	static_only = match args.map(OsStr.display) {
+		[] => Bool.False
+		["--static-only"] => Bool.True
+		_ => return Script.fail!("Usage: blueprint run check [-- --static-only]")
+	}
 	Script.command("roc-policy").run!(["check", "--root", "."].map(OsStr.from_str))?
 	check_tooling!()?
 	check_platform!()?
+	if static_only {
+		check_worktree!()?
+		return Script.pass!("Source checks completed successfully")
+	}
 	run_script!("scripts/build_platform.roc", [])?
 	run_script!("scripts/examples.roc", ["--operation", "run"])?
 	check_bundle!()?
@@ -27,6 +37,13 @@ main! = |_args| {
 
 check_tooling! = || {
 	Script.info!("CHECK", "Formatting and type-checking repository tooling")?
+	source = Path.read_utf8!(Path.utf8("scripts/check_all.roc"))?
+	header = match RocSource.app_header(source)? {
+		[found] => found
+		_ => return Script.fail!("Missing check script app header")
+	}
+	pin = RocSource.value_for(source, header, "roc")?
+	Script.require!(Path.read_utf8!(Path.utf8("Blueprint.roc"))?.contains("nix#rocpkgs.${pin}"), "Blueprint roc-stable must match the tooling script compiler")?
 	stable = Script.roc_stable!()?
 	script_files = Files.roc_files!(Path.utf8("scripts"))?
 	stable.run!(["fmt", "--check"].map(OsStr.from_str).concat(script_files.map(Path.to_os_str)))?

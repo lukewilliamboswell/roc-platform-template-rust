@@ -78,7 +78,7 @@ run! = |program, args| Script.command(program).run!(args.map(OsStr.from_str))
 cli_parser = Cli.assert_valid(
 	Cli.finish(
 		{
-			skip_host: Opt.flag({ short: "", long: "skip-host", help: "Verify/install linker inputs without compiling cached hosts.", default: Bool.False }),
+			skip_host: Opt.flag({ short: "", long: "skip-host", help: "Verify/install linker inputs without compiling cached hosts." }),
 			target: Opt.str({ short: "", long: "target", help: "native (default), all, or one of x64mac, arm64mac, x64musl, arm64musl.", default: Value("native") }),
 			runtime_candidate: Opt.str({ short: "", long: "runtime-candidate", help: "Unpublished linker-input archive to install instead of the release.", default: Value("") }),
 		}.Cli,
