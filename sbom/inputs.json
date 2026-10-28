@@ -1,0 +1,272 @@
+[
+  {
+    "input": "build-source:roc-7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "build-source:roc-GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "build-source:roc-JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:blueprint-sbom:aarch64-darwin",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:blueprint-sbom:aarch64-linux",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:blueprint-sbom:x86_64-linux",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:roc-docs:aarch64-darwin",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:roc-docs:aarch64-linux",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:roc-docs:x86_64-linux",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:roc-policy:aarch64-darwin",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:roc-policy:aarch64-linux",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "program:roc-policy:x86_64-linux",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "roc-package:7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "roc-package:GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "roc-package:JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "source:nix",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "source:roc",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "source:rust",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "source:zig",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:bindings",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:build-platform",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:bundle",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:check",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:check-source",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:docs",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:docs-path",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:docs-site",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:examples",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:host-fingerprint",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:policy",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:prepare-sbom",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:release-assets",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:release-evidence-test",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:runtime",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:runtime-build",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:runtime-cli-tests",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:runtime-test",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:stable-version",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:test-driver",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "task:tooling-tests",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#coreutils",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#curl",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#gh",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#git",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#gnutar",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#gzip",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#jq",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#python3",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#rust-bin.stable.\"1.95.0\".default",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#unzip",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#xz",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#zigpkgs.\"0.16.0\"",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#zip",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  },
+  {
+    "input": "tool:nix#zstd",
+    "component": "",
+    "reason": "Development/build tooling or task input; excluded from delivered software. Native runtime components and final member digests are inventoried separately."
+  }
+]

@@ -57,6 +57,7 @@ main! = |args| {
 }
 
 copy_platform! = |source_dir, stage, selected| {
+	Path.copy!(Path.utf8("LICENSE"), Path.join(stage, "LICENSE"))?
 	for path in Files.direct_files!(source_dir)? {
 		if Path.ext(path).map_ok(Path.display) == Ok("roc") {
 			Path.copy!(path, Path.join(stage, Path.filename(path).map_ok(Path.display)?))?
