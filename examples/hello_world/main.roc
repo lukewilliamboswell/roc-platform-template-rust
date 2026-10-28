@@ -2,7 +2,7 @@ app [main!] { roc: "nightly-2026-10-27-de79a0f", pf: platform "https://github.co
 
 import pf.Stdout
 
-main! : List(Str) => Try({}, [Exit(I32), StdoutErr(Str), ..])
+main! : List(Str) => Try({}, [Exit(I32), StdoutErr(Str)])
 main! = |_args| {
 	Stdout.line!("Hello, World!")?
 	Ok({})

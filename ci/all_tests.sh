@@ -394,6 +394,10 @@ run_bundle_suite() {
 
     local bundle_path
     bundle_path=$(echo "$bundle_output" | grep "^Created:" | awk '{print $2}')
+    # Newer roc prints the path relative to the bundling directory.
+    if [ -n "$bundle_path" ] && [[ "$bundle_path" != /* ]]; then
+      bundle_path="$temp_root/platform/$bundle_path"
+    fi
 
     if [ -z "$bundle_path" ] || [ ! -f "$bundle_path" ]; then
       echo "Error: could not extract bundle path from bundle output"

@@ -1,6 +1,6 @@
 platform ""
 	requires {
-		main! : List(Str) => Try({}, [Exit(I32), ..])
+		main! : List(Str) => Try({}, [Exit(I32)])
 	}
 	exposes [Stdout, Stderr, Stdin]
 	packages { roc: "nightly-2026-10-27-de79a0f" }
