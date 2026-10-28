@@ -21,14 +21,23 @@ class ExampleDriverTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.build.cleanup()
 
-    def run_case(self, program, expected='ok\n'):
+    def run_case(self, program, expected='ok\n', unlisted=False, empty=False, duplicate=False):
         with tempfile.TemporaryDirectory() as directory:
             suite = Path(directory)
-            (suite / 'app.roc').write_text('app [main!] { pf: platform "unused" }')
+            (suite / 'examples/demo').mkdir(parents=True)
+            (suite / 'examples/demo/main.roc').write_text('app [main!] { pf: platform "unused" }')
+            if unlisted:
+                (suite / 'examples/unlisted.roc').write_text('app [main!] { pf: platform "unused" }')
             (suite / 'spec.json').write_text(json.dumps({
                 'schema_version': 1, 'release': 'working-tree', 'dependencies': [],
-                'apps': [{'path': 'app.roc', 'cases': [{'name': 'case', 'args': [],
+                'apps': [{'path': 'examples/demo/main.roc', 'cases': [{'name': 'case', 'args': [],
                           'stdin': '', 'stdout': expected, 'stderr': '', 'exit_code': 0}]}]}))
+            spec = json.loads((suite / 'spec.json').read_text())
+            if empty:
+                spec['apps'][0]['cases'] = []
+            if duplicate:
+                spec['apps'].append(spec['apps'][0])
+            (suite / 'spec.json').write_text(json.dumps(spec))
             fake = suite / 'roc'
             fake.write_text('#!/usr/bin/env python3\nimport pathlib,sys\n'
                             'if sys.argv[1] == "build":\n'
@@ -44,6 +53,21 @@ class ExampleDriverTests(unittest.TestCase):
 
     def test_wrong_output_fails(self):
         self.assertNotEqual(self.run_case('#!/bin/sh\nprintf "wrong\\n"\n').returncode, 0)
+
+    def test_unlisted_application_fails(self):
+        result = self.run_case('#!/bin/sh\nprintf "ok\\n"\n', unlisted=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'Every working-tree example application', result.stderr)
+
+    def test_empty_cases_fail(self):
+        result = self.run_case('#!/bin/sh\nprintf "ok\\n"\n', empty=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'Suite needs nonempty cases', result.stderr)
+
+    def test_duplicate_applications_fail(self):
+        result = self.run_case('#!/bin/sh\nprintf "ok\\n"\n', duplicate=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'Suite contains duplicate applications', result.stderr)
 
     def test_hang_fails_with_driver_deadline(self):
         # Parent timeout is deliberately longer: the driver's own deadline must fail first.

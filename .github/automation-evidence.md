@@ -22,7 +22,7 @@ pre-adoption workflow runs do not establish that the new lock works.
 Local source-policy, formatting and unit checks passed with tooling compiler
 `nightly-2026-10-25-72704da`; product examples passed against
 `nightly-2026-10-28-bad769b`. The independent runtime suite has 33 tests, the
-example-driver suite has three cases including a deadline, and release-evidence
+example-driver suite has six cases including a deadline and missing coverage, and release-evidence
 checks exercise all four subjects plus tampered hashes, sidecars and inventories.
 
 The current [PR checks](https://github.com/lukewilliamboswell/roc-platform-template-rust/pull/81/checks)

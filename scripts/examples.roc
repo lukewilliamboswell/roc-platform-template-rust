@@ -25,6 +25,7 @@ import cli.Stderr
 import weaver.Cli
 import weaver.Opt
 import src/BundleServer
+import src/Files
 import src/RocSource
 import src/Script
 import src/WeaverCli
@@ -56,6 +57,19 @@ read_spec! = |suite| {
 	spec : Spec
 	spec = Json.parse(Path.read_utf8!(spec_path)?)?
 	Script.require!(spec.schema_version == 1 and !spec.apps.is_empty(), "${Path.display(spec_path)} is not a version 1 suite")?
+	Script.require!(spec.apps.all(|example| !example.cases.is_empty() and example.path.ends_with(".roc") and !example.path.starts_with("/") and example.path.split_on("/").all(|part| part != ".." and part != "." and !part.is_empty())), "Suite needs nonempty cases and safe relative app paths")?
+	Script.require!(spec.apps.all(|example| spec.apps.keep_if(|other| other.path == example.path).len() == 1), "Suite contains duplicate applications")?
+	if spec.release == "working-tree" and Path.is_dir!(Path.join(suite, "examples"))? {
+		root = Path.absolute!(suite)?
+		var $discovered = []
+		for path in Files.roc_files!(Path.join(root, "examples"))? {
+			if !RocSource.app_header(Path.read_utf8!(path)?)?.is_empty() {
+				$discovered = $discovered.append(Path.display(path).drop_prefix(Path.display(root).concat("/")))
+			}
+		}
+		declared = spec.apps.map(|example| example.path).keep_if(|path| path.starts_with("examples/"))
+		Script.require!($discovered.len() == declared.len() and $discovered.all(|path| declared.contains(path)), "Every working-tree example application must appear in tests/spec.json")?
+	}
 	Ok(spec)
 }
 

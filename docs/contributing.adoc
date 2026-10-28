@@ -56,6 +56,10 @@ examples and examples against a loopback-served bundle. `tests/spec.json`
 records arguments, input, exact output and exit status. A check never rewrites
 expectations. Review explicit expectation updates as behavior changes.
 
+Register every application under `examples/` in `tests/spec.json`. Validation
+rejects unlisted applications, duplicate application paths and empty case lists;
+adding a source file must not leave its behavior untested.
+
 [source,sh]
 ----
 blueprint run examples
