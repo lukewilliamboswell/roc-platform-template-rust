@@ -67,7 +67,7 @@ replace a published asset or move its tag.
 
 ## Routine consumption
 
-`build.sh` requests only the native target unless `--all` is used. The consumer:
+`blueprint run build-platform` requests only the native target unless `--target all` is used. The consumer:
 
 1. recomputes the producer fingerprint;
 2. locates the target archive in the local content cache;

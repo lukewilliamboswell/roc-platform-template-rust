@@ -1,204 +1,173 @@
 name: Release
 
+# A pull request runs the whole pipeline as a dry run under version 0.0.0-dryrun;
+# only a dispatch from main publishes.
 on:
   workflow_dispatch:
     inputs:
-      nightly_validation:
-        description: "Validate a nightly candidate without publishing or deploying"
-        type: boolean
-        required: false
-        default: false
       release_tag:
-        description: 'New package version (e.g., 1.1.0; no v prefix)'
-        required: false
+        description: 'New package version (e.g., 1.2.0; no v prefix)'
+        required: true
         type: string
   pull_request:
 
-# Ensure only one release workflow runs at a time
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  attestations: read
+permissions: {}
 
 jobs:
-  release-policy:
-    if: github.event_name == 'workflow_dispatch' && !inputs.nightly_validation
+  validate:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
-      sha: ${{ steps.policy.outputs.sha }}
       version: ${{ steps.policy.outputs.version }}
-      compiler: ${{ steps.policy.outputs.compiler-pin }}
-      compiler-channel: ${{ steps.policy.outputs.compiler-channel }}
+      publish: ${{ steps.policy.outputs.publish }}
+      nightly-tag: ${{ steps.nightly.outputs.tag }}
+    steps:
+      - id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [ "$EVENT" != workflow_dispatch ]; then
+            printf 'version=0.0.0-dryrun\npublish=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$REF" = "refs/heads/$DEFAULT_BRANCH" || { echo "Releases publish from $DEFAULT_BRANCH only" >&2; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must be MAJOR.MINOR.PATCH" >&2; exit 1; }
+          # Fail closed on an existing tag or an API error; never replace a release.
+          refs=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_TAG" --jq '.[].ref')
+          if printf '%s\n' "$refs" | grep -qx "refs/tags/$RELEASE_TAG"; then echo "Release tag already exists" >&2; exit 1; fi
+          printf 'version=%s\npublish=true\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+      - id: nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(gh api repos/roc-lang/nightlies/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and Bundle Platform
+    needs: validate
+    runs-on: macos-15  # macOS can cross-compile to all targets
+    permissions:
+      contents: read
+    outputs:
+      bundle_filename: ${{ steps.bundle.outputs.bundle_filename }}
+      examples_filename: ${{ steps.examples.outputs.examples_filename }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.sha }}
-      - id: policy
-        uses: lukewilliamboswell/roc-automation/actions/check-release@b60d561cbd53c911b29238b30624827f8487113a
+
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
         with:
-          version: ${{ inputs.release_tag }}
-          compiler-root: platform/main.roc
-          allow-default-branch: 'true'
-          allow-nightly-bootstrap: 'true'
+          install-nix: 'true'
 
-  build-and-bundle:
-    needs: release-policy
-    if: ${{ !cancelled() && (needs.release-policy.result == 'success' || needs.release-policy.result == 'skipped') }}
-    name: Build and Bundle Platform
-    runs-on: macos-15  # macOS can cross-compile to all targets
-    outputs:
-      bundle_filename: ${{ steps.bundle.outputs.bundle_filename }}
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Require a version for publication
-        if: github.event_name == 'workflow_dispatch' && !inputs.nightly_validation
-        shell: bash
-        env:
-          RELEASE_VERSION: ${{ inputs.release_tag }}
-        run: test -n "$RELEASE_VERSION" || { echo "A release version is required for publication" >&2; exit 1; }
-
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Zig
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+      - name: Install Roc nightly
+        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
-          version: 0.16.0
+          version: nightly-new-compiler
+          nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
 
       - name: Install Rust with cross-compilation targets
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           targets: x86_64-apple-darwin,aarch64-apple-darwin,x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
 
-      - name: Read pinned Roc nightly
-        shell: bash
-        run: |
-          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
-          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
-
-      - name: Install Roc nightly
-        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
-        with:
-          version: nightly-new-compiler
-          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
-
       - name: Build platform for all targets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./build.sh --all
+        run: blueprint run build-platform -- --target all
 
       - name: Bundle platform
         id: bundle
         run: |
-          # Run bundle.sh and capture output
-          set +e
-          BUNDLE_OUTPUT=$(./bundle.sh 2>&1)
-          BUNDLE_STATUS=$?
-          set -e
-          echo "$BUNDLE_OUTPUT"
-          test "$BUNDLE_STATUS" -eq 0 || exit "$BUNDLE_STATUS"
+          blueprint run bundle -- --target all --output-dir dist
+          bundles=(dist/*.tar.zst)
+          test "${#bundles[@]}" = 1
+          echo "bundle_filename=$(basename "${bundles[0]}")" >> "$GITHUB_OUTPUT"
 
-          # Extract the tar.zst filename from "Created: /path/to/HASH.tar.zst" line
-          BUNDLE_PATH=$(echo "$BUNDLE_OUTPUT" | grep "^Created:" | awk '{print $2}')
-          BUNDLE_FILENAME=$(basename "$BUNDLE_PATH")
+      - name: Package examples archive
+        id: examples
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          BUNDLE_FILENAME: ${{ steps.bundle.outputs.bundle_filename }}
+        run: |
+          EXAMPLES_FILENAME="roc-platform-template-rust-examples-$RELEASE_VERSION.zip"
+          blueprint run examples -- --operation package --release-version "$RELEASE_VERSION" \
+            --platform-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_VERSION/$BUNDLE_FILENAME" \
+            --output "dist/$EXAMPLES_FILENAME"
+          echo "examples_filename=$EXAMPLES_FILENAME" >> "$GITHUB_OUTPUT"
 
-          if [ -z "$BUNDLE_FILENAME" ]; then
-            echo "Error: Could not extract bundle filename from output"
-            echo "Bundle output was:"
-            echo "$BUNDLE_OUTPUT"
-            exit 1
-          fi
-
-          echo "Bundle created: $BUNDLE_FILENAME"
-          echo "bundle_filename=$BUNDLE_FILENAME" >> "$GITHUB_OUTPUT"
-
-      - name: Upload bundle artifact
+      - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: platform-bundle
-          path: ${{ steps.bundle.outputs.bundle_filename }}
+          name: release-assets
+          path: dist/
           retention-days: 30
 
-  test-bundle:
-    if: ${{ !cancelled() && needs.build-and-bundle.result == 'success' }}
+  # Each target runs the exact archive against the exact bundle with an empty
+  # package cache; only the bundle download location changes.
+  test:
     name: Test Bundle (${{ matrix.os }})
-    needs: build-and-bundle
+    needs: [validate, build]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         os:
           - macos-15          # Apple Silicon
-          - macos-15-intel    # Intel Mac
           - ubuntu-22.04      # Linux x86_64
           - ubuntu-24.04-arm  # Linux ARM64
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: bash
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Zig
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          version: 0.16.0
+          persist-credentials: false
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-
-      - name: Read pinned Roc nightly
-        shell: bash
-        run: |
-          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
-          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
+        with:
+          install-nix: 'true'
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
-          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
+          nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
 
-      - name: Download bundle artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: platform-bundle
+          name: release-assets
+          path: dist
 
-      - name: Run tests with bundled platform
+      - name: Run the archived examples against the bundle
         env:
-          BUNDLE_FILENAME: ${{ needs.build-and-bundle.outputs.bundle_filename }}
-        run: bash ci/test_bundle.sh "$BUNDLE_FILENAME"
+          BUNDLE_FILENAME: ${{ needs.build.outputs.bundle_filename }}
+          EXAMPLES_FILENAME: ${{ needs.build.outputs.examples_filename }}
+        run: blueprint run examples -- --operation test --archive "dist/$EXAMPLES_FILENAME" --bundle "dist/$BUNDLE_FILENAME"
 
-  build-docs:
+  docs:
     name: Build Platform Docs
+    needs: validate
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        shell: bash
-
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Read pinned Roc nightly
-        shell: bash
-        run: |
-          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
-          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
-          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
+          nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
 
       - name: Generate docs
         run: |
@@ -206,62 +175,65 @@ jobs:
           touch generated-docs/.nojekyll
 
       - name: Upload docs artifact
-        if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
+        if: needs.validate.outputs.publish == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: generated-docs
 
-  create-release:
+  publish:
     name: Create GitHub Release
-    needs: [release-policy, build-and-bundle, test-bundle, build-docs]
+    needs: [validate, build, test, docs]
+    if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
-    # Only run on manual trigger
-    if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
     permissions:
       contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Download bundle artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: platform-bundle
+          name: release-assets
+          path: dist
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.release-policy.outputs.version }}
-          RELEASE_SHA: ${{ needs.release-policy.outputs.sha }}
-          ROC_COMPILER: ${{ needs.release-policy.outputs.compiler }}
-          COMPILER_CHANNEL: ${{ needs.release-policy.outputs.compiler-channel }}
-          BUNDLE_FILENAME: ${{ needs.build-and-bundle.outputs.bundle_filename }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          ROC_COMPILER: ${{ needs.validate.outputs.nightly-tag }}
+          BUNDLE_FILENAME: ${{ needs.build.outputs.bundle_filename }}
+          EXAMPLES_FILENAME: ${{ needs.build.outputs.examples_filename }}
+        working-directory: dist
         run: |
           test -f "$BUNDLE_FILENAME"
-          # Fail closed for existing tags and API errors; never replace a release.
-          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_VERSION" > tags.json
-          python3 -c 'import json, os; assert not any(t["ref"] == "refs/tags/" + os.environ["RELEASE_VERSION"] for t in json.load(open("tags.json"))), "Release tag already exists"'
-          sha256sum "$BUNDLE_FILENAME" > SHA256SUMS
-          printf 'Compiler: `%s` (%s)\n\nTested source: `%s`\n\nPlatform: https://github.com/%s/releases/download/%s/%s\n' \
-            "$ROC_COMPILER" "$COMPILER_CHANNEL" "$RELEASE_SHA" "$GITHUB_REPOSITORY" "$RELEASE_VERSION" "$BUNDLE_FILENAME" > release-notes.md
-          gh release create "$RELEASE_VERSION" "$BUNDLE_FILENAME" SHA256SUMS \
-            --target "$RELEASE_SHA" --title "$RELEASE_VERSION" \
-            --generate-notes --notes-file release-notes.md
+          test -f "$EXAMPLES_FILENAME"
+          sha256sum "$BUNDLE_FILENAME" "$EXAMPLES_FILENAME" > SHA256SUMS
+          printf 'Tested with compiler: `%s`\n\nTested source: `%s`\n\nPlatform: https://github.com/%s/releases/download/%s/%s\n' \
+            "$ROC_COMPILER" "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$RELEASE_VERSION" "$BUNDLE_FILENAME" > ../release-notes.md
+          gh release create "$RELEASE_VERSION" "$BUNDLE_FILENAME" "$EXAMPLES_FILENAME" SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$RELEASE_VERSION" \
+            --generate-notes --notes-file ../release-notes.md
 
   deploy-docs:
     name: Deploy Docs to GitHub Pages
-    needs: [build-docs, create-release]
+    needs: [validate, docs, publish]
+    if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
-    if: (github.event_name == 'workflow_dispatch' && !inputs.nightly_validation)
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Deploy docs
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  required:
+    if: always()
+    needs: [validate, build, test, docs]
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do test "$result" = success || { echo "A required job did not succeed: $RESULTS" >&2; exit 1; }; done

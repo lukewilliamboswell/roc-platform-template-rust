@@ -1,0 +1,30 @@
+name: Nightly compatibility
+
+# The shared workflow selects one immutable release/compiler pair and owns
+# archive validation, compiler diagnostics, execution and issue reporting.
+on:
+  schedule:
+    - cron: '34 13 * * *'
+  workflow_dispatch:
+    inputs:
+      nightly-tag:
+        description: Exact diagnostic nightly; empty resolves latest
+        type: string
+        default: ''
+      release-tag:
+        description: Exact diagnostic release; empty resolves latest final release
+        type: string
+        default: ''
+
+permissions: {}
+
+jobs:
+  compatibility:
+    permissions:
+      contents: read
+      issues: write
+    uses: lukewilliamboswell/roc-automation/.github/workflows/nightly-compatibility.yml@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
+    with:
+      nightly-tag: ${{ inputs.nightly-tag || '' }}
+      release-tag: ${{ inputs.release-tag || '' }}
+      runners: '["ubuntu-22.04", "ubuntu-24.04-arm", "macos-15"]'

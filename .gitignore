@@ -43,3 +43,5 @@ __pycache__/
 # Independently built runtime artifacts
 dist/
 platform/runtime/
+.examples-build/
+.blueprint/
