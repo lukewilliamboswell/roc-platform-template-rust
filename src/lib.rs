@@ -2,7 +2,7 @@
 //!
 //! This host provides memory management and I/O effects for Roc programs.
 
-use std::ffi::c_void;
+use std::ffi::{c_char, c_void, CStr};
 use std::io::{self, BufRead, Write};
 use std::mem::ManuallyDrop;
 
@@ -221,18 +221,25 @@ pub extern "C" fn roc_crashed(bytes: *const u8, len: usize) {
     DefaultHandlers::roc_crashed(roc_host_ptr(), bytes, len);
 }
 
-/// Build a RocList<RocStr> from command-line arguments.
-fn build_args_list(roc_host: &RocHost) -> RocList<RocStr> {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.is_empty() {
+/// Build a RocList<RocStr> from the C `argc`/`argv`, program name first.
+///
+/// `std::env::args()` is not used: with this exported C `main` it is empty on
+/// static musl targets, while macOS still provides it.
+fn build_args_list(argc: i32, argv: *const *const c_char, roc_host: &RocHost) -> RocList<RocStr> {
+    let count = if argv.is_null() {
+        0
+    } else {
+        argc.max(0) as usize
+    };
+    if count == 0 {
         return RocList::empty();
     }
 
-    let list = RocList::<RocStr>::allocate(args.len(), roc_host);
+    let list = RocList::<RocStr>::allocate(count, roc_host);
     let elements = list.elements;
-    for (i, arg) in args.iter().enumerate() {
-        let roc_str = RocStr::from_str(arg, roc_host);
+    for i in 0..count {
+        let arg = unsafe { CStr::from_ptr(*argv.add(i)) }.to_string_lossy();
+        let roc_str = RocStr::from_str(&arg, roc_host);
         unsafe {
             elements.add(i).write(roc_str);
         }
@@ -243,16 +250,16 @@ fn build_args_list(roc_host: &RocHost) -> RocList<RocStr> {
 /// C-compatible main entry point for the Roc program.
 /// This is exported so the linker can find it.
 #[no_mangle]
-pub extern "C" fn main(_argc: i32, _argv: *const *const i8) -> i32 {
-    rust_main()
+pub extern "C" fn main(argc: i32, argv: *const *const c_char) -> i32 {
+    rust_main(argc, argv)
 }
 
 /// Main entry point for the Roc program.
-pub fn rust_main() -> i32 {
+pub fn rust_main(argc: i32, argv: *const *const c_char) -> i32 {
     let mut roc_host = make_roc_host(core::ptr::null_mut());
     set_roc_host(&mut roc_host);
 
-    let args_list = build_args_list(&roc_host);
+    let args_list = build_args_list(argc, argv, &roc_host);
 
     let exit_code = unsafe { roc_main(args_list) };
     set_roc_host(core::ptr::null_mut());

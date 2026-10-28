@@ -10,23 +10,21 @@ A template for building [Roc platforms](https://www.roc-lang.org/platforms) usin
 ## Requirements
 
 - [Rust](https://rustup.rs/) (stable)
-- Python 3.12+ and authenticated [GitHub CLI](https://cli.github.com/) for verified Linux runtime downloads
-- [Roc](https://www.roc-lang.org/) on `PATH`, matching the `roc` pin in the application header
+- [Blueprint](https://github.com/lukewilliamboswell/roc-blueprint) with Nix, which provides the tooling compiler and tools
+- Python 3.12+ and authenticated [GitHub CLI](https://cli.github.com/) for verified Linux linker-input downloads
+- The latest [Roc](https://www.roc-lang.org/) nightly on `PATH`
 
 ## Examples
 
+The examples in `examples/` use this checkout's platform by relative path, so
+they follow the working tree and need the host built first
+(`blueprint run build-platform`). Run one with
+`roc examples/hello_world/main.roc`, or build a standalone executable with
+`roc build examples/hello_world/main.roc`.
 
-The examples use the immutable [1.1.0 release](https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/tag/1.1.0). Install the compiler declared in the example header first:
-
-```roc
-app [main!] { roc: "nightly-2026-09-05-b195f5b", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" }
-```
-
-Run an example directly: `roc examples/hello_world/main.roc`.
-
-Each application folder contains `main.roc` and any companion modules. The header declares a compiler requirement; it does not install a compiler.
-
-Build standalone executable: `roc build examples/hello_world/main.roc`
+To use a released platform, download `roc-platform-template-rust-examples-<version>.zip`
+from the [latest release](https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/latest);
+its examples name that release's bundle URL and carry no compiler pin.
 
 ## Documentation
 
@@ -38,14 +36,22 @@ Generate docs locally:
 roc docs platform/main.roc --output=generated-docs --no-cache
 ```
 
+## Tooling
+
+Repository automation is written as Roc scripts in `scripts/`, run through
+[Blueprint](https://github.com/lukewilliamboswell/roc-blueprint) tasks declared
+in `Blueprint.roc`. Blueprint provides `roc-stable`, the pinned compiler that
+runs the scripts. The platform and examples use the `roc` on your `PATH`, which
+should be the latest nightly; nothing outside `scripts/` pins a compiler.
+
 ## Building
 
 ```bash
-# Build for native platform only
-./build.sh
+# Build for the native target only
+blueprint run build-platform
 
 # Build for all supported targets (cross-compilation)
-./build.sh --all
+blueprint run build-platform -- --target all
 ```
 
 ## Regenerating glue
@@ -61,32 +67,35 @@ This overwrites `src/roc_platform_abi.rs` with updated type definitions and host
 ## Bundling
 
 ```bash
-./bundle.sh
+blueprint run bundle -- --output-dir dist
 ```
 
-This creates a `.tar.zst` bundle containing all `.roc` files, prebuilt host libraries, verified linker inputs, and their license, provenance, manifest, and SBOM metadata. Run `./build.sh --all` first.
+This creates a `.tar.zst` bundle containing all `.roc` files, prebuilt host libraries, verified linker inputs, and their license, provenance, manifest, and SBOM metadata. Run `blueprint run build-platform -- --target all` first. `--target native` bundles only this machine's target, for local testing.
 
 ## Running Tests
 
 ```bash
-bash ci/all_tests.sh
+blueprint run check
 ```
 
-This builds the platform and runs all examples using `roc` from your local `PATH`. For the local-platform pass, the script copies the examples to a temp directory and rewrites their release bundle dependency to this checkout's `platform/main.roc`.
+This formats and type-checks the tooling and platform, builds the native host,
+and runs every example in `tests/spec.json`, comparing exact stdout, stderr and
+exit codes. It then bundles the platform for the native target, serves it over
+localhost with an empty package cache, and runs the examples again against the
+bundle.
 
-The script also creates a native-target platform bundle, serves it over localhost, rewrites temporary copies of the examples to use that package URL, and runs the examples again against the bundled package.
-
-Useful focused runs:
+The examples reference the platform by relative path. Each release attaches
+`roc-platform-template-rust-examples-<version>.zip`, a frozen copy that names
+the release bundle, which the shared
+[roc-automation](https://github.com/lukewilliamboswell/roc-automation) nightly
+runs daily against the latest Roc nightly (`.github/workflows/nightly.yml`).
 
 ```bash
-# Test committed published dependencies from a fresh cache
-RUN_PUBLIC_TESTS=1 RUN_LOCAL_TESTS=0 RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
+# Run the working-tree examples only (after building the native host)
+blueprint run examples
 
-# Skip the package URL pass
-RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
-
-# Test only a package URL
-RUN_LOCAL_TESTS=0 PACKAGE_URL="https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" bash ci/all_tests.sh
+# Run an examples archive against a bundle
+blueprint run examples -- --operation test --archive <examples.zip> --bundle <bundle.tar.zst>
 ```
 
 ## Supported Targets
@@ -111,23 +120,12 @@ The main function receives command-line arguments as `List(Str)` and returns `Tr
 
 ## Compiler updates and releases
 
-`main` tracks an exact nightly in the platform and application headers.
-The nightly updater advances these pins together while preserving release URLs.
-CI separately checks published examples, current source, and proposed archives.
-A published-example failure blocks the compiler update even if source tests pass.
-Auto-merge is disabled; compiler fixes and URL updates require review.
-See [nightly updates](.github/ROC_NIGHTLY.md).
+Package versions are independent of compiler versions. Dispatch Release from
+`main` with a new unprefixed version such as `1.2.0`. The workflow builds every
+target, bundles the platform, packages the examples archive, tests that exact
+archive against that exact bundle on each target with an empty cache, and
+publishes them at the tested commit with checksums and the compiler it was
+tested with. Existing tags are never replaced. Committed examples are never
+rewritten to release URLs.
 
-Releases explicitly use the shared exact-nightly bootstrap policy on `main`;
-this is not stable compiler support or an LTS promise. Package versions are
-independent of compiler versions. Dispatch Release with a new unprefixed version
-such as `1.1.0`. The workflow tests the proposed archive and publishes it at the
-tested commit, recording its compiler requirement and checksum. Existing tags
-must not be replaced. Inspect partial publications before recovering a failed run.
-
-After publication, maintainers must test the new download from a fresh cache and
-prepare complete example starters. Open a signed, validated follow-up PR updating
-example URLs and README release links, preserving development compiler pins.
-Starter publication and versioned documentation preservation remain manual;
-the existing Pages workflow publishes only the current API documentation.
 No compiler support branches or automatic backports are currently maintained.

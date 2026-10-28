@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "release": "working-tree",
+  "dependencies": [],
+  "apps": [
+    {
+      "path": "examples/all_roc_syntax/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "Hello, world!\nHello, world! (using alias)\n{ diff: 5, div: 2, div_trunc: 2, eq: False, gt: True, gteq: True, lt: False, lteq: False, neg: -10, neq: True, prod: 50, rem: 0, sum: 15 }\n{ bool_and_keyword: False, bool_or_keyword: True, not_a: False }\n\"One Two\"\n\"Three Four\"\nThe color is red.\n78\nSuccess\nLine 1\nLine 2\nLine 3\nUnicode escape sequence: \u00a0\nThis is an effectful function!\n15.0\nFalse\n10.0\n42\nNotOneTwoNotFive\n(\"Roc\", 1.0)\n[\"a\", \"b\"]\n(\"Roc\", 1, 1, \"Roc\")\n10.0\n{ age: 31, name: \"Alice\" }\n{ binary: 5.0, explicit_i128: 5, explicit_i16: 5, explicit_i32: 5, explicit_i64: 5, explicit_i8: 5, explicit_u128: 5, explicit_u16: 5, explicit_u32: 5, explicit_u64: 5, explicit_u8: 5, hex: 5.0, octal: 5.0, usage_based: 5.0 }\n<opaque>\n\"The secret key is: my_secret_key\"\nFalse\n99\n\"12345.0\"\n\"Foo with 42 and hello\"\n\"other color\"\n\"A\"\n\"other letter\"\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/cli_args/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "Hello Roc!\nArgs: \n",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "name": "with-args",
+          "args": [
+            "one",
+            "two"
+          ],
+          "stdin": "",
+          "stdout": "Hello Roc!\nArgs: one, two\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/dbg_test/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "stdout works\n",
+          "stderr": "[ROC DBG] \"test message\"\n",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/echo/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "bundled input\n",
+          "stdout": "Enter something and I'll echo it back:\nYou entered: bundled input\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/echo_multiline/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "first line\nsecond line\n",
+          "stdout": "first line\nsecond line\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/exit/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "This example exits with a non-zero exit code\n",
+          "stderr": "",
+          "exit_code": 23
+        }
+      ]
+    },
+    {
+      "path": "examples/fizzbuzz/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/hello_world/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "Hello, World!\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/match/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "match no extra args: yes\nmatch extra args: no\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/stderr/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "This message goes to stdout\nYou can redirect it with: roc run example.roc > out.txt\n",
+          "stderr": "This message goes to stderr\nYou can redirect it with: roc run example.roc 2> err.txt\n",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/sum_fold/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "Joined: Hello World!\nFruits: apple, banana, cherry\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "examples/tests/main.roc",
+      "cases": [
+        {
+          "name": "default",
+          "args": [],
+          "stdin": "",
+          "stdout": "Run 'roc test --verbose examples/tests/main.roc' to execute the tests\n",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    }
+  ]
+}

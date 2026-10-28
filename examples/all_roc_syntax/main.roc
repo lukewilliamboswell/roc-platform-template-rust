@@ -1,4 +1,4 @@
-app [main!] { roc: "nightly-2026-10-17-5f126ac", pf: platform "https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/download/1.1.0/BqAtivonrp6omZf8pQLHed3JtdE5TuaWT3ybEgWrLDZ.tar.zst" }
+app [main!] { pf: platform "../../platform/main.roc" }
 
 import pf.Stdout
 import pf.Stdout as StdoutAlias
@@ -75,7 +75,7 @@ match_list_patterns = |lst| {
 
 match_tag_union_advanced : Try({}, [StdoutErr(Str), Other]) -> Str
 match_tag_union_advanced = |try|
-# `Try(a, b)` is the tag union `[Ok(a), Err(b)]` under the hood.
+	# `Try(a, b)` is the tag union `[Ok(a), Err(b)]` under the hood.
 	match try {
 		Ok(_) =>
 			"Success"
@@ -85,7 +85,7 @@ match_tag_union_advanced = |try|
 
 		Err(_) =>
 			"Unknown error"
-		}
+	}
 
 multiline_str : U64 -> Str
 multiline_str = |number|
@@ -95,7 +95,7 @@ multiline_str = |number|
 
 # end name with `!` for effectful functions
 # `=>` shows effectfulness in the type signature
-effect_demo! : Str => Try({}, [StdoutErr(Str), ..])
+effect_demo! : Str => Try({}, [StdoutErr(Str)])
 effect_demo! = |msg|
 	Stdout.line!(msg)
 
@@ -149,7 +149,7 @@ while_loop = |limit| {
 	$sum
 }
 
-print! : _ => Try({}, [StdoutErr(Str), ..])
+print! : _ => Try({}, [StdoutErr(Str)])
 print! = |something| {
 	Stdout.line!(Str.inspect(something))
 }
@@ -170,10 +170,10 @@ dbg_keyword = || {
 if_demo : U64 -> Str
 if_demo = |num| {
 	# every if must have an else branch!
-	one_line_if = if num == 1 "One" else "NotOne"
+	one_line_if = if (num == 1) "One" else "NotOne"
 
 	two_line_if =
-		if num == 2
+		if (num == 2)
 			"Two"
 		else
 			"NotTwo"
@@ -186,16 +186,16 @@ if_demo = |num| {
 		}
 
 	# else if
-	if num == 3
+	if (num == 3)
 		"Three"
-	else if num == 4
+	else if (num == 4)
 		"Four"
 	else
 		one_line_if.concat(two_line_if).concat(with_curlies)
 }
 
 tuple_demo =
-# tuples can contain multiple types
+	# tuples can contain multiple types
 	("Roc", 1)
 
 # Here we use a type variable `a` to indicate this function works for a list of any type.
@@ -319,7 +319,7 @@ letter_to_str = |letter| match letter {
 stringify : a -> Str where [a.to_str : a -> Str]
 stringify = |value| value.to_str()
 
-main! : List(Str) => Try({}, [Exit(I32), StdoutErr(Str), ..])
+main! : List(Str) => Try({}, [Exit(I32), StdoutErr(Str)])
 main! = |_args| {
 	Stdout.line!("Hello, world!")?
 	StdoutAlias.line!("Hello, world! (using alias)")?
@@ -332,7 +332,7 @@ main! = |_args| {
 	print!("One".concat(" Two"))?
 
 	# If you want a very similar style for a function that is not defined on the type but is in scope, you can use `->`:
-	print!("Three"->my_concat(" Four"))?
+	print!("Three" |> my_concat(" Four"))?
 
 	Stdout.line!(simple_match(Red))?
 	print!(match_list_patterns([1, 10]))?

@@ -1,88 +1,92 @@
 name: CI
 
 on:
-  workflow_dispatch:
-    inputs:
-      nightly_validation:
-        description: "Validate a nightly candidate without publishing or deploying"
-        type: boolean
-        required: false
-        default: false
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  attestations: read
+permissions: {}
 
 jobs:
-  build:
-    name: ${{ matrix.lane }} (${{ matrix.os }})
+  # One compiler per run: every job checks the platform with the same latest nightly.
+  resolve:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      nightly-tag: ${{ steps.nightly.outputs.tag }}
+    steps:
+      - id: nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(gh api repos/roc-lang/nightlies/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
+
+  check:
+    name: check (${{ matrix.os }})
+    needs: resolve
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
-        lane: [current-source, published-examples]
         os:
-          - macos-15       # Apple Silicon
-          - macos-15-intel # Intel Mac
-          - ubuntu-22.04   # Linux x86_64
+          - macos-15         # Apple Silicon
+          - ubuntu-22.04     # Linux x86_64
           - ubuntu-24.04-arm # Linux ARM64
-    defaults:
-      run:
-        shell: bash
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Read linker-input cache identity
-        if: matrix.lane == 'current-source'
-        id: linker-inputs
-        shell: bash
-        run: |
-          if test -f runtime/link-inputs.lock.json; then
-            printf 'key=%s\n' "$(sha256sum runtime/link-inputs.lock.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-          else
-            printf 'key=legacy-bootstrap\n' >> "$GITHUB_OUTPUT"
-          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Restore content-addressed linker-input archives
-        if: matrix.lane == 'current-source'
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: ~/.cache/roc-platform-template-rust/link-inputs
-          key: linker-inputs-${{ steps.linker-inputs.outputs.key }}
+          key: linker-inputs-${{ hashFiles('runtime/link-inputs.lock.json') }}
 
-      - name: Install Zig
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
         with:
-          version: 0.16.0
-
-      - name: Read pinned Roc nightly
-        shell: bash
-        run: |
-          ROC_NIGHTLY_TAG=$(python3 ci/compiler_version.py)
-          printf 'ROC_NIGHTLY_TAG=%s\n' "$ROC_NIGHTLY_TAG" >> "$GITHUB_ENV"
+          install-nix: 'true'
 
       - name: Install Roc nightly
         uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
-          nightly-tag: ${{ env.ROC_NIGHTLY_TAG }}
+          nightly-tag: ${{ needs.resolve.outputs.nightly-tag }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
-      - name: Test current source and local bundle
-        if: matrix.lane == 'current-source'
+      - name: Repository checks
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash ci/all_tests.sh
+        run: blueprint run check
 
-      - name: Test committed published examples with a fresh cache
-        if: matrix.lane == 'published-examples'
-        run: RUN_PUBLIC_TESTS=1 RUN_LOCAL_TESTS=0 RUN_BUNDLE_TEST=0 bash ci/all_tests.sh
+  runtime-tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Linker-input tooling tests
+        run: python3 -m unittest discover -s ci -p 'test_*.py' -v
+
+  required:
+    name: CI required
+    if: always()
+    needs: [check, runtime-tests]
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do test "$result" = success || { echo "A required job did not succeed: $RESULTS" >&2; exit 1; }; done
