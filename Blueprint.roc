@@ -3,8 +3,8 @@ app [config] { pf: platform "https://github.com/lukewilliamboswell/roc-blueprint
 # Two compilers are in play. `roc-stable` is the pinned nightly that runs the
 # repository tooling in scripts/; its tag matches every script header. The
 # platform and examples use whichever `roc` is on PATH, normally the latest
-# nightly, so Blueprint deliberately provides no bare `roc`. The Rust host
-# toolchain comes from rust-toolchain.toml via rustup.
+# nightly, so Blueprint deliberately provides no bare `roc`. Blueprint also
+# declares the Rust host compiler, source component and cross-target libraries.
 
 import pf.Recipes
 
