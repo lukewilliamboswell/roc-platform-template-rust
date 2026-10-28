@@ -11,6 +11,7 @@ import src/Files
 import src/HostFingerprint
 import src/ReleaseArtifacts
 import src/RocSource
+import src/RuntimeProducer
 
 main! = |_args| Ok({})
 
