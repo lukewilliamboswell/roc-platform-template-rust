@@ -252,6 +252,59 @@ class RuntimeArchiveTests(unittest.TestCase):
             self.assertNotEqual(run.returncode, 0)
             self.assertFalse(log.exists())
 
+    def reject_native_metadata(self, change, expected_error):
+        native_binary = ROOT / '.blueprint' / 'runtime-native-cli-tests'
+        if not hasattr(type(self), '_native_binary'):
+            subprocess.run(['roc-stable', 'build', 'scripts/runtime_test.roc', f'--output={native_binary}'],
+                           cwd=ROOT, check=True, timeout=120)
+            type(self)._native_binary = str(native_binary)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'runtime').mkdir()
+            (root / 'runtime/source.json').write_bytes((ROOT / 'runtime/source.json').read_bytes())
+            archive = self.archive(root, combined=True)
+            archive.rename(root / 'linux-runtime.tar.gz')
+            digest = hashlib.sha256((root / 'linux-runtime.tar.gz').read_bytes()).hexdigest()
+            (root / 'runtime-lock.proposed.json').write_text(json.dumps({'sha256': digest}))
+            (root / 'SHA256SUMS').write_text(f'{digest}  linux-runtime.tar.gz\n')
+            (root / 'runtime.spdx.json').write_text(json.dumps({'creationInfo': {'created': '2026-10-29T00:00:00Z'}}))
+            tools = root / 'bin'
+            tools.mkdir()
+            helper = ('#!' + sys.executable + '\n' +
+                      'import pathlib, sys\n' +
+                      "name = pathlib.Path(sys.argv[0]).name\n" +
+                      "if name == 'uname': print('Linux' if sys.argv[1] == '-s' else 'x86_64')\n" +
+                      "elif name == 'date': print(sys.argv[3])\n" +
+                      "else: pathlib.Path('unexpected-download').write_text('called'); sys.exit(91)\n")
+            for name in ('uname', 'date', 'curl'):
+                executable = tools / name
+                executable.write_text(helper)
+                executable.chmod(0o755)
+            change(root)
+            env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'])
+            run = subprocess.run([type(self)._native_binary, 'test', '--directory', str(root),
+                                  '--target', 'x64musl'], cwd=root, env=env, capture_output=True, timeout=20)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn(expected_error, run.stderr.decode(errors='replace'))
+            self.assertFalse((root / 'unexpected-download').exists())
+
+    def test_native_candidate_rejects_wrong_archive_digest_before_download(self):
+        self.reject_native_metadata(
+            lambda root: (root / 'runtime-lock.proposed.json').write_text(json.dumps({'sha256': '0' * 64})),
+            'Candidate archive differs from declared digest')
+
+    def test_native_candidate_rejects_wrong_checksum_file_before_download(self):
+        self.reject_native_metadata(lambda root: (root / 'SHA256SUMS').write_text('wrong'),
+                                    'Candidate checksum file differs from archive')
+
+    def test_native_candidate_rejects_wrong_sbom_before_download(self):
+        self.reject_native_metadata(lambda root: None,
+                                    'Candidate SBOM differs from verified inventory')
+
+    def test_native_candidate_rejects_missing_timestamp_before_download(self):
+        self.reject_native_metadata(lambda root: (root / 'runtime.spdx.json').write_text('{}'),
+                                    'Candidate SBOM creation time is missing')
+
     def test_unsupported_schema_fails(self):
         self.verdict(lambda manifest, members: manifest.__setitem__('schema_version', 99))
 
