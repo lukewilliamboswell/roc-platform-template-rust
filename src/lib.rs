@@ -97,7 +97,7 @@ fn roc_host() -> &'static RocHost {
 fn stderr_line_ok() -> HostStderrLineResult {
     HostStderrLineResult {
         payload: HostStderrLineResultPayload {
-            ok: ManuallyDrop::new(()),
+            ok: [],
         },
         tag: HostStderrLineResultTag::Ok,
     }
@@ -133,7 +133,7 @@ fn stdin_line_err(err: impl std::fmt::Display) -> HostStdinLineResult {
 fn stdout_line_ok() -> HostStdoutLineResult {
     HostStdoutLineResult {
         payload: HostStdoutLineResultPayload {
-            ok: ManuallyDrop::new(()),
+            ok: [],
         },
         tag: HostStdoutLineResultTag::Ok,
     }
@@ -152,7 +152,8 @@ fn stdout_line_err(err: impl std::fmt::Display) -> HostStdoutLineResult {
 #[no_mangle]
 pub extern "C" fn roc_stderr_line(message: RocStr) -> HostStderrLineResult {
     let result = writeln!(io::stderr(), "{}", message.as_str());
-    message.decref(roc_host());
+    // The hosted call transfers ownership of this Roc string to the host.
+    unsafe { message.decref(roc_host()) };
 
     match result {
         Ok(()) => stderr_line_ok(),
@@ -179,7 +180,8 @@ pub extern "C" fn roc_stdin_line() -> HostStdinLineResult {
 #[no_mangle]
 pub extern "C" fn roc_stdout_line(message: RocStr) -> HostStdoutLineResult {
     let result = writeln!(io::stdout(), "{}", message.as_str());
-    message.decref(roc_host());
+    // The hosted call transfers ownership of this Roc string to the host.
+    unsafe { message.decref(roc_host()) };
 
     match result {
         Ok(()) => stdout_line_ok(),
@@ -189,7 +191,7 @@ pub extern "C" fn roc_stdout_line(message: RocStr) -> HostStdoutLineResult {
 
 #[no_mangle]
 pub extern "C" fn roc_alloc(length: usize, alignment: usize) -> *mut c_void {
-    DefaultAllocators::roc_alloc(roc_host_ptr(), length, alignment)
+    DefaultAllocators::roc_alloc(roc_host_ptr(), length, alignment).as_ptr()
 }
 
 #[no_mangle]
@@ -203,7 +205,7 @@ pub extern "C" fn roc_realloc(
     new_length: usize,
     alignment: usize,
 ) -> *mut c_void {
-    DefaultAllocators::roc_realloc(roc_host_ptr(), ptr, new_length, alignment)
+    DefaultAllocators::roc_realloc(roc_host_ptr(), ptr, new_length, alignment).as_ptr()
 }
 
 #[no_mangle]
@@ -235,7 +237,8 @@ fn build_args_list(argc: i32, argv: *const *const c_char, roc_host: &RocHost) ->
         return RocList::empty();
     }
 
-    let list = RocList::<RocStr>::allocate(count, roc_host);
+    // Every allocated slot is initialized below before the list reaches Roc.
+    let list = unsafe { RocList::<RocStr>::allocate(count, roc_host) };
     let elements = list.elements;
     for i in 0..count {
         let arg = unsafe { CStr::from_ptr(*argv.add(i)) }.to_string_lossy();
