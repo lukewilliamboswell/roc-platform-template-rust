@@ -13,7 +13,6 @@ concurrency:
 permissions: {}
 
 jobs:
-  # One compiler per run: every job checks the platform with the same latest nightly.
   resolve:
     runs-on: ubuntu-24.04
     permissions:
@@ -27,62 +26,145 @@ jobs:
         run: echo "tag=$(gh api repos/roc-lang/nightlies/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
 
   check:
-    name: check (${{ matrix.os }})
+    name: Source and bindings
     needs: resolve
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          install-nix: 'true'
+      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+        with:
+          version: nightly-new-compiler
+          nightly-tag: ${{ needs.resolve.outputs.nightly-tag }}
+      - name: Source policy, formatting and unit tests
+        run: blueprint run check-source
+      - name: Example driver failure and timeout regressions
+        run: blueprint run test-driver
+      - name: Verify generated host bindings against the selected nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ needs.resolve.outputs.nightly-tag }}
+        run: blueprint run bindings -- --nightly-tag "$NIGHTLY_TAG"
+
+  build:
+    name: Build one bundle
+    needs: resolve
+    runs-on: macos-15
+    permissions:
+      contents: read
+    outputs:
+      bundle: ${{ steps.package.outputs.bundle }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          install-nix: 'true'
+      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+        with:
+          version: nightly-new-compiler
+          nightly-tag: ${{ needs.resolve.outputs.nightly-tag }}
+      - name: Fingerprint native inputs, actual toolchain and SDK
+        id: host-key
+        run: |
+          blueprint run host-fingerprint
+          echo "key=$(cat .blueprint/host-fingerprint)" >> "$GITHUB_OUTPUT"
+      - name: Restore only exactly matching host archives
+        id: host
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: |
+            platform/targets/*/libhost.a
+            platform/targets/*/libhost.a.sha256
+          key: host-${{ runner.os }}-${{ steps.host-key.outputs.key }}
+      - name: Restore content-addressed linker inputs
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.cache/roc-platform-template-rust/link-inputs
+          key: linker-inputs-${{ hashFiles('runtime/link-inputs.lock.json') }}
+      - name: Build hosts once for every cross-compilation target
+        if: steps.host.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: blueprint run build-platform -- --target all
+      - name: Verify locked inputs when hosts were restored
+        if: steps.host.outputs.cache-hit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: blueprint run build-platform -- --target all --skip-host
+      - name: Bundle once and freeze examples
+        id: package
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          blueprint run bundle -- --target all --output-dir dist
+          bundles=(dist/*.tar.zst)
+          test "${#bundles[@]}" = 1
+          bundle=$(basename "${bundles[0]}")
+          blueprint run examples -- --operation package --release-version 0.0.1-dryrun --platform-url "https://github.com/$REPOSITORY/releases/download/0.0.1-dryrun/$bundle" --output dist/roc-platform-template-rust-examples-0.0.1-dryrun.zip
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ci-bundle
+          path: dist/
+          if-no-files-found: error
+
+  test:
+    name: Test bundle (${{ matrix.os }})
+    needs: [resolve, build]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - macos-15         # Apple Silicon
-          - ubuntu-22.04     # Linux x86_64
-          - ubuntu-24.04-arm # Linux ARM64
+        # Intel macOS is cross-compiled, but has no native-execution evidence.
+        os: [ubuntu-22.04, ubuntu-24.04-arm, macos-15]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Restore content-addressed linker-input archives
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
-        with:
-          path: ~/.cache/roc-platform-template-rust/link-inputs
-          key: linker-inputs-${{ hashFiles('runtime/link-inputs.lock.json') }}
-
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
         with:
           install-nix: 'true'
-
-      - name: Install Roc nightly
-        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
           nightly-tag: ${{ needs.resolve.outputs.nightly-tag }}
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-
-      - name: Repository checks
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ci-bundle
+          path: dist
+      - name: Execute archived examples against the exact bundle
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: blueprint run check
+          BUNDLE: ${{ needs.build.outputs.bundle }}
+        run: blueprint run examples -- --operation test --archive dist/roc-platform-template-rust-examples-0.0.1-dryrun.zip --bundle "dist/$BUNDLE"
 
   runtime-tests:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Linker-input tooling tests
-        run: python3 -m unittest discover -s ci -p 'test_*.py' -v
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          install-nix: 'true'
+      - name: Linker-input archive admission regressions
+        run: blueprint run runtime-cli-tests
 
   required:
     name: CI required
     if: always()
-    needs: [check, runtime-tests]
+    needs: [resolve, check, build, test, runtime-tests]
     runs-on: ubuntu-24.04
     permissions: {}
     steps:

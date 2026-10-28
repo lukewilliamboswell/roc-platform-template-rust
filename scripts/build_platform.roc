@@ -32,6 +32,16 @@ main! = |args| {
 		other => if (Targets.all.contains(other)) [other] else return Err(UnknownTarget(other))
 	}
 	install_linker_inputs!(selected, options.runtime_candidate)?
+	if options.skip_host {
+		for target in selected {
+			host = Path.utf8("platform/targets/${target}/libhost.a")
+			recorded = Path.utf8("platform/targets/${target}/libhost.a.sha256")
+			Script.require!(Path.type!(host)? == IsFile and Path.type!(recorded)? == IsFile, "Missing regular cached host or digest: ${target}")?
+			actual = host_digest!(host)?
+			Script.require!(actual == Path.read_utf8!(recorded)?, "Cached host digest mismatch: ${target}")?
+		}
+		return Script.pass!("Verified linker inputs; reusing fingerprinted host archives")
+	}
 	for target in selected {
 		build!(target, target == native)?
 	}
@@ -43,9 +53,9 @@ install_linker_inputs! = |selected, candidate| {
 	if musl.is_empty() {
 		Ok({})
 	} else if !candidate.is_empty() {
-		run!("python3", ["ci/runtime.py", "install-candidate", candidate])
+		run!("roc-stable", ["scripts/runtime.roc", "--", "install-candidate", candidate])
 	} else {
-		run!("python3", ["ci/runtime.py", "fetch"].concat(musl.join_map(|target| ["--target", target])))
+		run!("roc-stable", ["scripts/runtime.roc", "--", "fetch"].concat(musl.join_map(|target| ["--target", target])))
 	}
 }
 
@@ -58,7 +68,6 @@ build! = |target, is_native| {
 		run!("cargo", ["build", "--release", "--locked", "--lib"])?
 		copy_host!(target, "target/release/libhost.a")
 	} else {
-		run!("rustup", ["target", "add", triple])?
 		run!("cargo", ["build", "--release", "--locked", "--lib", "--target", triple])?
 		copy_host!(target, "target/${triple}/release/libhost.a")
 	}
@@ -68,7 +77,13 @@ copy_host! = |target, built| {
 	directory = Path.utf8("platform/targets/${target}")
 	Path.create_all!(directory)?
 	Path.copy!(Path.utf8(built), Path.join(directory, "libhost.a"))?
+	Path.write_utf8!(Path.join(directory, "libhost.a.sha256"), host_digest!(Path.join(directory, "libhost.a"))?)?
 	Script.info!("HOST", "platform/targets/${target}/libhost.a")
+}
+
+host_digest! = |path| {
+	bytes = Script.command("sha256sum").capture!([Path.to_os_str(path)], Path.utf8("."), [])?
+	Ok(Str.from_utf8_lossy(bytes).split_on(" ").first()?.concat("\n"))
 }
 
 run! = |program, args| Script.command(program).run!(args.map(OsStr.from_str))
@@ -76,6 +91,7 @@ run! = |program, args| Script.command(program).run!(args.map(OsStr.from_str))
 cli_parser = Cli.assert_valid(
 	Cli.finish(
 		{
+			skip_host: Opt.flag({ short: "", long: "skip-host", help: "Verify/install linker inputs without compiling cached hosts." }),
 			target: Opt.str({ short: "", long: "target", help: "native (default), all, or one of x64mac, arm64mac, x64musl, arm64musl.", default: Value("native") }),
 			runtime_candidate: Opt.str({ short: "", long: "runtime-candidate", help: "Unpublished linker-input archive to install instead of the release.", default: Value("") }),
 		}.Cli,

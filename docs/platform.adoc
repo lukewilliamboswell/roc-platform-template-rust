@@ -1,0 +1,38 @@
+= Understand the platform interface
+
+== Application entry point
+
+The application provides `main!`, receiving `List(Str)` and returning
+`Try({}, [Exit(I32), ..])`. An `Ok({})` result exits successfully; `Err(Exit(code))`
+uses the supplied process exit status. Other errors are reported on standard
+error and return a failure status.
+
+== Host services
+
+[cols="1,2",options="header"]
+|===
+| Service | Behavior
+| `Stdout.line!` | Write a line to standard output.
+| `Stderr.line!` | Write a line to standard error.
+| `Stdin.line!` | Read a line from standard input.
+|===
+
+The https://lukewilliamboswell.github.io/roc-platform-template-rust/[generated API reference] documents the public Roc types.
+The Rust host owns allocation, process I/O and the generated ABI boundary.
+
+== Targets and validation
+
+[cols="1,2,2",options="header"]
+|===
+| Bundle target | Host architecture | Native compatibility coverage
+| `x64musl` | Linux x86_64 with musl | Ubuntu x86_64 runner
+| `arm64musl` | Linux ARM64 with musl | Ubuntu ARM64 runner
+| `arm64mac` | Apple Silicon macOS | Apple Silicon macOS runner
+| `x64mac` | Intel macOS | Cross-compiled only; native validation disabled pending upstream support
+|===
+
+Every host is stored at `platform/targets/<target>/libhost.a` in the bundle.
+Cross-compilation is evidence that the host compiles; it does not establish
+native execution. Do not interpret the compatibility badge as Intel macOS
+validation. Native coverage is tracked in
+https://github.com/lukewilliamboswell/roc-automation/issues/101[roc-automation#101].

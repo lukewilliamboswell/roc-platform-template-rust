@@ -17,6 +17,7 @@ app [main!] {
 ##   test     run a suite (working tree or --archive) against --bundle served
 ##            from loopback, with an empty package cache
 
+import cli.Duration
 import cli.Env
 import cli.OsStr
 import cli.Path
@@ -24,6 +25,7 @@ import cli.Stderr
 import weaver.Cli
 import weaver.Opt
 import src/BundleServer
+import src/Files
 import src/RocSource
 import src/Script
 import src/WeaverCli
@@ -55,6 +57,19 @@ read_spec! = |suite| {
 	spec : Spec
 	spec = Json.parse(Path.read_utf8!(spec_path)?)?
 	Script.require!(spec.schema_version == 1 and !spec.apps.is_empty(), "${Path.display(spec_path)} is not a version 1 suite")?
+	Script.require!(spec.apps.all(|example| !example.cases.is_empty() and example.path.ends_with(".roc") and !example.path.starts_with("/") and example.path.split_on("/").all(|part| part != ".." and part != "." and !part.is_empty())), "Suite needs nonempty cases and safe relative app paths")?
+	Script.require!(spec.apps.all(|example| spec.apps.keep_if(|other| other.path == example.path).len() == 1), "Suite contains duplicate applications")?
+	if spec.release == "working-tree" and Path.is_dir!(Path.join(suite, "examples"))? {
+		root = Path.absolute!(suite)?
+		var $discovered = []
+		for path in Files.roc_files!(Path.join(root, "examples"))? {
+			if !RocSource.app_header(Path.read_utf8!(path)?)?.is_empty() {
+				$discovered = $discovered.append(Path.display(path).drop_prefix(Path.display(root).concat("/")))
+			}
+		}
+		declared = spec.apps.map(|example| example.path).keep_if(|path| path.starts_with("examples/"))
+		Script.require!($discovered.len() == declared.len() and $discovered.all(|path| declared.contains(path)), "Every working-tree example application must appear in tests/spec.json")?
+	}
 	Ok(spec)
 }
 
@@ -67,6 +82,7 @@ run_suite! = |suite| {
 	build_dir = Path.join(suite, ".examples-build")
 	Path.create_all!(build_dir)?
 	var $failures = []
+	var $tested = 0.U64
 	for example in spec.apps {
 		source = Path.join(suite, example.path)
 		exe = Path.join(build_dir, example.path.replace_each("/", "_").replace_last(".roc", ""))
@@ -76,7 +92,9 @@ run_suite! = |suite| {
 			$failures = $failures.append("${example.path}: roc check exited ${check.to_str()}, roc build exited ${build.to_str()}")
 		} else {
 			for test_case in example.cases {
-				output = Script.command(Path.to_os_str(exe)).base.args(test_case.args.map(OsStr.from_str)).stdin(Bytes(test_case.stdin.to_utf8())).run!().map_err(|err| CaseRunFailed(example.path, err))?
+				$tested = $tested + 1
+				Script.info!("CASE", "${$tested.to_str()}: ${example.path} [${test_case.name}]")?
+				output = Script.command(Path.to_os_str(exe)).base.args(test_case.args.map(OsStr.from_str)).stdin(Bytes(test_case.stdin.to_utf8())).timeout(Duration.seconds(10)).output_limit(MaxBytes(10_000_000)).manage_tree(Bool.True).run!().map_err(|err| CaseRunFailed(example.path, err))?
 				code = match output.status {
 					Exited(value) => value
 					Signaled(_) => -1
@@ -92,6 +110,7 @@ run_suite! = |suite| {
 			}
 		}
 	}
+	Script.info!("SUMMARY", "${$tested.to_str()} cases executed; ${$failures.len().to_str()} failures; 0 skipped")?
 	if $failures.is_empty() {
 		Script.pass!("All example cases passed.")
 	} else {

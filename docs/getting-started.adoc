@@ -1,0 +1,44 @@
+= Run a Roc application
+
+== Use a released platform
+
+Install the latest Roc nightly, then download and extract
+`roc-platform-template-rust-examples-<version>.zip` from the
+https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/latest[latest release].
+The archive includes a README and an executable specification of the examples'
+arguments, standard input, output and exit status.
+
+[source,sh]
+----
+roc examples/hello_world/main.roc
+roc build examples/hello_world/main.roc
+----
+
+The archive's applications name the release's immutable platform URL. Keep that
+URL when creating your own application. The hash in its filename verifies the
+bundle content. The platform does not pin your compiler; the daily compatibility
+workflow checks the published examples against the latest nightly.
+
+== Use a working checkout
+
+Install Blueprint, Nix and a current Roc nightly available as `roc`. Run the
+same named tasks locally and in CI:
+
+[source,sh]
+----
+blueprint run build-platform
+roc examples/hello_world/main.roc
+blueprint run check
+----
+
+Committed examples depend on `../../platform/main.roc`, so they exercise your
+changes. They require a host built from this checkout. Downloaded release
+examples instead use their release's bundle and need no local Rust host build.
+
+== Choose an example
+
+`hello_world` demonstrates output. `cli_args` receives arguments, `echo` reads
+one line, `echo_multiline` reads multiple lines, and `exit` demonstrates a
+nonzero application exit status. `tests/spec.json` records their exact behavior.
+The syntax and debug examples also serve as integration fixtures; they are not
+additional platform services.

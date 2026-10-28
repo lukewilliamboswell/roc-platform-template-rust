@@ -1,0 +1,24 @@
+= Report security concerns
+
+[#report-a-vulnerability]
+== Report a vulnerability
+
+Use https://github.com/lukewilliamboswell/roc-platform-template-rust/security/advisories/new[GitHub's private vulnerability reporting form].
+Do not put sensitive reproduction details in a public issue. Include the
+release or source commit, affected target, impact and a minimal reproducer.
+See the repository's `SECURITY.md` for the same reporting entry point.
+
+== Supported releases
+
+Security fixes target the latest platform release. Older releases do not
+receive automatic backports. Upgrade to a fixed release when one is available.
+There is no promised response time. Public reports and advisories identify
+which releases and targets are affected when that information is established.
+
+== Verify what you consume
+
+Use immutable release URLs and verify downloaded hashes. Product release
+sidecars describe artifact composition and documented gaps; provenance records
+the producer and source. Neither establishes that the software is free of
+vulnerabilities. Missing supplier coverage is reported as incomplete, never as
+proof that a component is absent.

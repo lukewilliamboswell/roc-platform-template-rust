@@ -5,7 +5,12 @@
 //!
 //! Hosted argument ownership:
 //! - Roc transfers ownership of refcounted arguments to the hosted function.
-//! - The hosted function must decref owned refcounted arguments when done.
+//! - The hosted function must release owned refcounted arguments when done, using
+//!   the release call named in each hosted symbol's doc comment below.
+//! - Releasing a container releases its elements only when the container's own
+//!   count reaches zero, which is what compiled Roc code does when it drops one
+//!   it owns. Releasing the elements unconditionally double-frees them whenever
+//!   the Roc caller still holds the container.
 //! - If the host stores or returns an argument, it must retain or transfer ownership explicitly.
 //!
 //! Import this module from the platform host and implement the listed hosted symbols
@@ -13,10 +18,96 @@
 
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(dead_code)]
+#![allow(improper_ctypes)]
+#![allow(improper_ctypes_definitions)]
+// `no_roc_std_helpers` is supplied by host build tooling and cannot be registered from source.
+#![allow(unexpected_cfgs)]
 
 use core::ffi::c_void;
-use core::sync::atomic::{AtomicIsize, Ordering};
+use core::ptr::NonNull;
+use core::sync::atomic::{fence, AtomicIsize, Ordering};
+#[cfg(not(no_roc_std_helpers))]
 use std::alloc::Layout;
+
+/// Runtime representation of Roc's fixed-point `Dec` value.
+///
+/// `num` stores the decimal value scaled by 10^18.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RocDec {
+    pub num: i128,
+}
+
+const _: [(); 16] = [(); core::mem::size_of::<RocDec>()];
+const _: [(); 16] = [(); core::mem::align_of::<RocDec>()];
+
+#[cfg(target_arch = "x86_64")]
+type RocU8x16Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocI8x16Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocU16x8Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocI16x8Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocU32x4Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocI32x4Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocU64x2Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "x86_64")]
+type RocI64x2Native = core::arch::x86_64::__m128i;
+#[cfg(target_arch = "aarch64")]
+type RocU8x16Native = core::arch::aarch64::uint8x16_t;
+#[cfg(target_arch = "aarch64")]
+type RocI8x16Native = core::arch::aarch64::int8x16_t;
+#[cfg(target_arch = "aarch64")]
+type RocU16x8Native = core::arch::aarch64::uint16x8_t;
+#[cfg(target_arch = "aarch64")]
+type RocI16x8Native = core::arch::aarch64::int16x8_t;
+#[cfg(target_arch = "aarch64")]
+type RocU32x4Native = core::arch::aarch64::uint32x4_t;
+#[cfg(target_arch = "aarch64")]
+type RocI32x4Native = core::arch::aarch64::int32x4_t;
+#[cfg(target_arch = "aarch64")]
+type RocU64x2Native = core::arch::aarch64::uint64x2_t;
+#[cfg(target_arch = "aarch64")]
+type RocI64x2Native = core::arch::aarch64::int64x2_t;
+#[cfg(target_arch = "wasm32")]
+type RocU8x16Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocI8x16Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocU16x8Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocI16x8Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocU32x4Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocI32x4Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocU64x2Native = core::arch::wasm32::v128;
+#[cfg(target_arch = "wasm32")]
+type RocI64x2Native = core::arch::wasm32::v128;
+
+macro_rules! roc_simd_type {
+    ($name:ident, $native:ident) => {
+        #[repr(transparent)]
+        #[derive(Clone, Copy)]
+        pub struct $name(pub $native);
+        const _: [(); 16] = [(); core::mem::size_of::<$name>()];
+        const _: [(); 16] = [(); core::mem::align_of::<$name>()];
+    };
+}
+roc_simd_type!(RocU8x16, RocU8x16Native);
+roc_simd_type!(RocI8x16, RocI8x16Native);
+roc_simd_type!(RocU16x8, RocU16x8Native);
+roc_simd_type!(RocI16x8, RocI16x8Native);
+roc_simd_type!(RocU32x4, RocU32x4Native);
+roc_simd_type!(RocI32x4, RocI32x4Native);
+roc_simd_type!(RocU64x2, RocU64x2Native);
+roc_simd_type!(RocI64x2, RocI64x2Native);
+
 
 /// Runtime representation of an opaque `Box(T)` value.
 pub type RocBox = *mut c_void;
@@ -28,9 +119,11 @@ pub type RocBox = *mut c_void;
 #[repr(C)]
 pub struct RocHost {
     pub env: *mut c_void,
-    pub roc_alloc: extern "C" fn(*mut RocHost, usize, usize) -> *mut c_void,
+    /// Never returns null; see `roc_alloc` below.
+    pub roc_alloc: extern "C" fn(*mut RocHost, usize, usize) -> NonNull<c_void>,
     pub roc_dealloc: extern "C" fn(*mut RocHost, *mut c_void, usize),
-    pub roc_realloc: extern "C" fn(*mut RocHost, *mut c_void, usize, usize) -> *mut c_void,
+    /// Never returns null; see `roc_realloc` below.
+    pub roc_realloc: extern "C" fn(*mut RocHost, *mut c_void, usize, usize) -> NonNull<c_void>,
     pub roc_dbg: extern "C" fn(*mut RocHost, *const u8, usize),
     pub roc_expect_failed: extern "C" fn(*mut RocHost, *const u8, usize),
     pub roc_crashed: extern "C" fn(*mut RocHost, *const u8, usize),
@@ -45,7 +138,7 @@ impl RocHost {
     #[inline]
     pub unsafe fn alloc(&self, alignment: usize, length: usize) -> *mut c_void {
         let host = self as *const RocHost as *mut RocHost;
-        (self.roc_alloc)(host, length, alignment)
+        (self.roc_alloc)(host, length, alignment).as_ptr()
     }
 
     /// Deallocate memory previously allocated with `alloc`.
@@ -72,12 +165,33 @@ impl RocHost {
         new_length: usize,
     ) -> *mut c_void {
         let host = self as *const RocHost as *mut RocHost;
-        (self.roc_realloc)(host, old_ptr, new_length, alignment)
+        (self.roc_realloc)(host, old_ptr, new_length, alignment).as_ptr()
     }
 }
 
+#[inline]
+fn checked_add_usize(left: usize, right: usize, context: &str) -> usize {
+    left.checked_add(right).expect(context)
+}
+
+#[inline]
+fn checked_mul_usize(left: usize, right: usize, context: &str) -> usize {
+    left.checked_mul(right).expect(context)
+}
+
+#[inline]
+fn shifted_capacity(capacity: usize) -> usize {
+    capacity.checked_shl(1).expect("Roc capacity does not fit shifted representation")
+}
+
 /// Uniform ABI function pointer stored in `RocErasedCallablePayload`.
-pub type RocErasedCallableFn = extern "C" fn(*mut RocHost, *mut u8, *const u8, *mut u8);
+///
+/// The final `reuse` pointer is nullable. Non-null must be the callable data
+/// pointer whose inline capture begins at `capture`; it transfers one owned
+/// reference to the callee. The caller must not use or decref that ownership
+/// unit after the call. The callee consumes it exactly once, whether or not the
+/// result can reuse the allocation.
+pub type RocErasedCallableFn = extern "C" fn(*mut RocHost, *mut u8, *const u8, *mut u8, *mut u8, *mut *const c_void);
 
 /// Final-drop callback for inline erased-callable captures.
 pub type RocErasedCallableOnDrop = extern "C" fn(*mut u8, *mut RocHost);
@@ -90,6 +204,10 @@ pub struct RocErasedCallablePayload {
     pub on_drop: Option<RocErasedCallableOnDrop>,
 }
 
+const _: () = assert!(core::mem::size_of::<RocErasedCallablePayload>() == 2 * core::mem::size_of::<usize>(), "RocErasedCallablePayload size mismatch");
+const _: () = assert!(core::mem::offset_of!(RocErasedCallablePayload, callable_fn_ptr) == 0, "RocErasedCallablePayload.callable_fn_ptr offset mismatch");
+const _: () = assert!(core::mem::offset_of!(RocErasedCallablePayload, on_drop) == core::mem::size_of::<usize>(), "RocErasedCallablePayload.on_drop offset mismatch");
+
 /// Runtime representation of `Box(function)`.
 pub type RocErasedCallable = *mut u8;
 
@@ -99,8 +217,12 @@ pub const ROC_ERASED_CALLABLE_CAPTURE_OFFSET: usize =
     (core::mem::size_of::<RocErasedCallablePayload>() + 15) & !15;
 
 #[inline]
-pub const fn roc_erased_callable_payload_size(capture_size: usize) -> usize {
-    ROC_ERASED_CALLABLE_CAPTURE_OFFSET + capture_size
+pub fn roc_erased_callable_payload_size(capture_size: usize) -> usize {
+    checked_add_usize(
+        ROC_ERASED_CALLABLE_CAPTURE_OFFSET,
+        capture_size,
+        "Roc erased-callable payload size overflow",
+    )
 }
 
 #[inline]
@@ -132,7 +254,12 @@ pub unsafe fn roc_erased_callable_allocate(
     let ptr_width = core::mem::size_of::<usize>();
     let alignment = core::cmp::max(ptr_width, ROC_ERASED_CALLABLE_PAYLOAD_ALIGNMENT);
     let extra_bytes = core::cmp::max(ptr_width, ROC_ERASED_CALLABLE_PAYLOAD_ALIGNMENT);
-    let base = roc_host.alloc(alignment, extra_bytes + roc_erased_callable_payload_size(capture_size)) as *mut u8;
+    let total = checked_add_usize(
+        extra_bytes,
+        roc_erased_callable_payload_size(capture_size),
+        "Roc erased-callable allocation size overflow",
+    );
+    let base = roc_host.alloc(alignment, total) as *mut u8;
     let data = base.add(extra_bytes);
     let rc = data.sub(core::mem::size_of::<isize>()) as *mut isize;
     *rc = 1;
@@ -149,33 +276,42 @@ pub unsafe fn roc_erased_callable_allocate(
 pub type RocBoxPayloadDecref = extern "C" fn(*mut c_void, *mut RocHost);
 
 /// Increment the refcount of a boxed payload data pointer.
-pub fn incref_box(data_ptr: RocBox, amount: isize) {
+///
+/// # Safety
+/// `data_ptr` must be a valid Roc box payload pointer. The caller must ensure
+/// that the extra retained references are balanced by later decrefs.
+pub unsafe fn incref_box(data_ptr: RocBox, amount: isize) {
     let data = match box_data_ptr(data_ptr) {
         Some(ptr) => ptr,
         None => return,
     };
     let rc = box_refcount_ptr(data);
+    if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+        return; // REFCOUNT_STATIC_DATA
+    }
     unsafe {
-        if (*rc).load(Ordering::Relaxed) == 0 {
-            return; // REFCOUNT_STATIC_DATA
-        }
         (*rc).fetch_add(amount, Ordering::Relaxed);
     }
 }
 
 /// Allocate a Roc box and return a pointer to its payload data.
-pub fn allocate_box(
+///
+/// # Safety
+/// The returned payload memory is uninitialized. The caller must initialize it
+/// according to the Roc type before exposing it to safe APIs or Roc code.
+pub unsafe fn allocate_box(
     payload_size: usize,
     payload_alignment: usize,
     payload_contains_refcounted: bool,
     roc_host: &RocHost,
 ) -> RocBox {
     let ptr_width = core::mem::size_of::<usize>();
-    let required_space = if payload_contains_refcounted { 2 * ptr_width } else { ptr_width };
+    let required_space = if payload_contains_refcounted { checked_mul_usize(2, ptr_width, "Roc box header size overflow") } else { ptr_width };
     let header_bytes = required_space.max(payload_alignment);
     let alloc_alignment = ptr_width.max(payload_alignment);
-    let base = unsafe { roc_host.alloc(alloc_alignment, header_bytes + payload_size) } as *mut u8;
-    let data = unsafe { base.add(header_bytes) };
+    let total = checked_add_usize(header_bytes, payload_size, "Roc box allocation size overflow");
+    let base = roc_host.alloc(alloc_alignment, total) as *mut u8;
+    let data = base.add(header_bytes);
     unsafe {
         let rc = data.sub(core::mem::size_of::<isize>()) as *mut isize;
         *rc = 1;
@@ -184,24 +320,39 @@ pub fn allocate_box(
 }
 
 /// Decrement a pointer-aligned boxed payload with no Roc refcounted values.
-pub fn decref_box(data_ptr: RocBox, roc_host: &RocHost) {
-    decref_box_with(data_ptr, core::mem::align_of::<usize>(), false, None, roc_host);
+///
+/// # Safety
+/// `data_ptr` must be a valid Roc box payload pointer owned by this reference.
+pub unsafe fn decref_box(data_ptr: RocBox, roc_host: &RocHost) {
+    unsafe {
+        decref_box_with(data_ptr, core::mem::align_of::<usize>(), false, None, roc_host);
+    }
 }
 
 /// Increment a boxed function closure.
-pub fn incref_erased_callable(callable: RocErasedCallable, amount: isize) {
-    incref_box(callable as RocBox, amount);
+///
+/// # Safety
+/// `callable` must be a valid Roc erased-callable payload pointer.
+pub unsafe fn incref_erased_callable(callable: RocErasedCallable, amount: isize) {
+    unsafe {
+        incref_box(callable as RocBox, amount);
+    }
 }
 
 /// Decrement a boxed function closure and run its capture drop callback on final release.
-pub fn decref_erased_callable(callable: RocErasedCallable, roc_host: &RocHost) {
-    decref_box_with(
-        callable as RocBox,
-        ROC_ERASED_CALLABLE_PAYLOAD_ALIGNMENT,
-        false,
-        Some(drop_erased_callable_payload),
-        roc_host,
-    );
+///
+/// # Safety
+/// `callable` must be a valid Roc erased-callable payload pointer owned by this reference.
+pub unsafe fn decref_erased_callable(callable: RocErasedCallable, roc_host: &RocHost) {
+    unsafe {
+        decref_box_with(
+            callable as RocBox,
+            ROC_ERASED_CALLABLE_PAYLOAD_ALIGNMENT,
+            false,
+            Some(drop_erased_callable_payload),
+            roc_host,
+        );
+    }
 }
 
 extern "C" fn drop_erased_callable_payload(data_ptr: *mut c_void, roc_host: *mut RocHost) {
@@ -224,7 +375,11 @@ extern "C" fn drop_erased_callable_payload(data_ptr: *mut c_void, roc_host: *mut
 /// `payload_decref` teardown callback is supplied. A host resource handle such
 /// as `Box(U64)` holding a raw pointer has `payload_contains_refcounted: false`
 /// even when it provides a teardown callback to free the underlying resource.
-pub fn decref_box_with(
+///
+/// # Safety
+/// `data_ptr` must be a valid Roc box payload pointer owned by this reference,
+/// and `payload_alignment`/`payload_contains_refcounted` must match allocation.
+pub unsafe fn decref_box_with(
     data_ptr: RocBox,
     payload_alignment: usize,
     payload_contains_refcounted: bool,
@@ -236,24 +391,26 @@ pub fn decref_box_with(
         None => return,
     };
     let rc = box_refcount_ptr(data);
-    unsafe {
-        if (*rc).load(Ordering::Relaxed) == 0 {
-            return; // REFCOUNT_STATIC_DATA
+    if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+        return; // REFCOUNT_STATIC_DATA
+    }
+    let prev = unsafe { (*rc).fetch_sub(1, Ordering::Release) };
+    if prev == 1 {
+        fence(Ordering::Acquire);
+        if let Some(callback) = payload_decref {
+            callback(data_ptr, roc_host as *const RocHost as *mut RocHost);
         }
-        let prev = (*rc).fetch_sub(1, Ordering::Relaxed);
-        if prev == 1 {
-            if let Some(callback) = payload_decref {
-                callback(data_ptr, roc_host as *const RocHost as *mut RocHost);
-            }
-            free_box_allocation(data, payload_alignment, payload_contains_refcounted, roc_host);
-        }
+        free_box_allocation(data, payload_alignment, payload_contains_refcounted, roc_host);
     }
 }
 
 /// Free a boxed payload allocation immediately after running payload teardown.
 ///
 /// See `decref_box_with` for the meaning of `payload_contains_refcounted`.
-pub fn free_box_with(
+///
+/// # Safety
+/// `data_ptr` must be a valid Roc box payload pointer that will not be used after this call.
+pub unsafe fn free_box_with(
     data_ptr: RocBox,
     payload_alignment: usize,
     payload_contains_refcounted: bool,
@@ -277,7 +434,7 @@ pub fn is_unique_box(data_ptr: RocBox) -> bool {
         None => return true,
     };
     let rc = box_refcount_ptr(data);
-    unsafe { (*rc).load(Ordering::Relaxed) == 1 }
+    unsafe { (*rc).load(Ordering::Acquire) == 1 }
 }
 
 fn box_data_ptr(data_ptr: RocBox) -> Option<*mut u8> {
@@ -299,7 +456,7 @@ fn free_box_allocation(
     roc_host: &RocHost,
 ) {
     let ptr_width = core::mem::size_of::<usize>();
-    let required_space = if payload_contains_refcounted { 2 * ptr_width } else { ptr_width };
+    let required_space = if payload_contains_refcounted { checked_mul_usize(2, ptr_width, "Roc box header size overflow") } else { ptr_width };
     let header_bytes = required_space.max(payload_alignment);
     let alloc_alignment = ptr_width.max(payload_alignment);
     let base = unsafe { data.sub(header_bytes) } as *mut c_void;
@@ -326,6 +483,12 @@ pub struct RocStr {
     pub capacity_or_alloc_ptr: usize,
     pub length: usize,
 }
+
+const _: () = assert!(core::mem::size_of::<RocStr>() == 3 * core::mem::size_of::<usize>(), "RocStr size mismatch");
+const _: () = assert!(core::mem::align_of::<RocStr>() == core::mem::align_of::<usize>(), "RocStr alignment mismatch");
+const _: () = assert!(core::mem::offset_of!(RocStr, bytes) == 0, "RocStr.bytes offset mismatch");
+const _: () = assert!(core::mem::offset_of!(RocStr, capacity_or_alloc_ptr) == core::mem::size_of::<usize>(), "RocStr.capacity_or_alloc_ptr offset mismatch");
+const _: () = assert!(core::mem::offset_of!(RocStr, length) == 2 * core::mem::size_of::<usize>(), "RocStr.length offset mismatch");
 
 const ROC_STR_SIZE: usize = core::mem::size_of::<RocStr>();
 const ROC_SMALL_STR_MAX_LEN: usize = ROC_STR_SIZE - 1;
@@ -388,14 +551,14 @@ impl RocStr {
         }
     }
 
-    /// Return the string contents as a `&str`, assuming valid UTF-8.
+    /// Return the string contents as a `&str`.
     pub fn as_str(&self) -> &str {
-        // SAFETY: Roc guarantees all strings are valid UTF-8.
-        unsafe { core::str::from_utf8_unchecked(self.as_slice()) }
+        core::str::from_utf8(self.as_slice()).expect("RocStr contained invalid UTF-8")
     }
 
-    /// Create a RocStr from a byte slice, using `roc_host` for heap allocation if needed.
+    /// Create a RocStr from a UTF-8 byte slice, using `roc_host` for heap allocation if needed.
     pub fn from_slice(slice: &[u8], roc_host: &RocHost) -> Self {
+        core::str::from_utf8(slice).expect("RocStr::from_slice requires valid UTF-8");
         if slice.len() < ROC_STR_SIZE {
             let mut result = Self::empty();
             let ptr = &mut result as *mut Self as *mut u8;
@@ -406,7 +569,7 @@ impl RocStr {
             result
         } else {
             let ptr_width = core::mem::size_of::<usize>();
-            let total = ptr_width + slice.len();
+            let total = checked_add_usize(ptr_width, slice.len(), "RocStr allocation size overflow");
             let base = unsafe { roc_host.alloc(core::mem::align_of::<usize>(), total) };
             let data_ptr = unsafe { (base as *mut u8).add(ptr_width) };
             // Write refcount = 1
@@ -417,7 +580,7 @@ impl RocStr {
             }
             Self {
                 bytes: data_ptr,
-                capacity_or_alloc_ptr: slice.len() << 1,
+                capacity_or_alloc_ptr: shifted_capacity(slice.len()),
                 length: slice.len(),
             }
         }
@@ -429,7 +592,11 @@ impl RocStr {
     }
 
     /// Decrement the reference count; frees the allocation when it reaches zero.
-    pub fn decref(&self, roc_host: &RocHost) {
+    ///
+    /// # Safety
+    /// `self` must own one live Roc reference. Calling this more than once for the
+    /// same ownership reference may double-free.
+    pub unsafe fn decref(self, roc_host: &RocHost) {
         if self.is_small_str() {
             return;
         }
@@ -437,22 +604,27 @@ impl RocStr {
         if alloc_ptr.is_null() {
             return;
         }
-        unsafe {
-            let rc = (alloc_ptr as *mut AtomicIsize).sub(1);
-            if (*rc).load(Ordering::Relaxed) == 0 {
-                return; // REFCOUNT_STATIC_DATA — bytes are in read-only memory
-            }
-            let prev = (*rc).fetch_sub(1, Ordering::Relaxed);
-            if prev == 1 {
-                let ptr_width = core::mem::size_of::<usize>();
-                let base = alloc_ptr.sub(ptr_width) as *mut c_void;
+        let rc = unsafe { (alloc_ptr as *mut AtomicIsize).sub(1) };
+        if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+            return; // REFCOUNT_STATIC_DATA—bytes are in read-only memory
+        }
+        let prev = unsafe { (*rc).fetch_sub(1, Ordering::Release) };
+        if prev == 1 {
+            fence(Ordering::Acquire);
+            let ptr_width = core::mem::size_of::<usize>();
+            let base = unsafe { alloc_ptr.sub(ptr_width) } as *mut c_void;
+            unsafe {
                 roc_host.dealloc(base, core::mem::align_of::<usize>());
             }
         }
     }
 
     /// Increment the reference count by `amount`.
-    pub fn incref(&self, amount: isize) {
+    ///
+    /// # Safety
+    /// `self` must point at a live Roc allocation. The retained references must
+    /// be balanced by later decrefs.
+    pub unsafe fn incref(self, amount: isize) {
         if self.is_small_str() {
             return;
         }
@@ -460,11 +632,11 @@ impl RocStr {
         if alloc_ptr.is_null() {
             return;
         }
+        let rc = unsafe { (alloc_ptr as *mut AtomicIsize).sub(1) };
+        if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+            return; // REFCOUNT_STATIC_DATA
+        }
         unsafe {
-            let rc = (alloc_ptr as *mut AtomicIsize).sub(1);
-            if (*rc).load(Ordering::Relaxed) == 0 {
-                return; // REFCOUNT_STATIC_DATA
-            }
             (*rc).fetch_add(amount, Ordering::Relaxed);
         }
     }
@@ -480,7 +652,7 @@ impl RocStr {
         }
         unsafe {
             let rc = (alloc_ptr as *const AtomicIsize).sub(1);
-            let count = (*rc).load(Ordering::Relaxed);
+            let count = (*rc).load(Ordering::Acquire);
             count == 0 || count == 1
         }
     }
@@ -497,7 +669,6 @@ impl RocStr {
 impl core::fmt::Debug for RocStr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("RocStr")
-            .field("value", &self.as_str())
             .field("len", &self.len())
             .field("is_small", &self.is_small_str())
             .finish()
@@ -520,11 +691,17 @@ pub struct RocListWith<T, const ELEMENTS_REFCOUNTED: bool> {
     pub capacity_or_alloc_ptr: usize,
 }
 
+const _: () = assert!(core::mem::size_of::<RocList<u8>>() == 3 * core::mem::size_of::<usize>(), "RocList size mismatch");
+const _: () = assert!(core::mem::align_of::<RocList<u8>>() == core::mem::align_of::<usize>(), "RocList alignment mismatch");
+const _: () = assert!(core::mem::offset_of!(RocList<u8>, elements) == 0, "RocList.elements offset mismatch");
+const _: () = assert!(core::mem::offset_of!(RocList<u8>, length) == core::mem::size_of::<usize>(), "RocList.length offset mismatch");
+const _: () = assert!(core::mem::offset_of!(RocList<u8>, capacity_or_alloc_ptr) == 2 * core::mem::size_of::<usize>(), "RocList.capacity_or_alloc_ptr offset mismatch");
+
 impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
     #[inline]
     fn header_bytes() -> usize {
         let ptr_width = core::mem::size_of::<usize>();
-        let required_space = if ELEMENTS_REFCOUNTED { 2 * ptr_width } else { ptr_width };
+        let required_space = if ELEMENTS_REFCOUNTED { checked_mul_usize(2, ptr_width, "RocList header size overflow") } else { ptr_width };
         required_space.max(core::mem::align_of::<T>())
     }
 
@@ -602,34 +779,47 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
     }
 
     /// Allocate a new list with space for `length` elements.
-    pub fn allocate(length: usize, roc_host: &RocHost) -> Self {
+    ///
+    /// # Safety
+    /// The returned element memory is uninitialized while `length` is already
+    /// set. The caller must initialize every element before exposing the list
+    /// to safe APIs, Roc code, or generated refcount helpers.
+    pub unsafe fn allocate(length: usize, roc_host: &RocHost) -> Self {
         if length == 0 {
             return Self::empty();
         }
         let align = core::mem::align_of::<T>().max(core::mem::align_of::<usize>());
         let header_bytes = Self::header_bytes();
-        let data_bytes = length * core::mem::size_of::<T>();
-        let total = data_bytes + header_bytes;
-        let base = unsafe { roc_host.alloc(align, total) };
-        let data_ptr = unsafe { (base as *mut u8).add(header_bytes) };
-        // Write refcount = 1
+        let data_bytes = checked_mul_usize(length, core::mem::size_of::<T>(), "RocList allocation element bytes overflow");
+        let total = checked_add_usize(data_bytes, header_bytes, "RocList allocation size overflow");
+        let base = roc_host.alloc(align, total);
+        let data_ptr = (base as *mut u8).add(header_bytes);
         unsafe {
             let rc = (data_ptr as *mut isize).sub(1);
             *rc = 1;
+            if ELEMENTS_REFCOUNTED {
+                let count = (data_ptr as *mut usize).sub(2);
+                *count = length;
+            }
         }
         Self {
             elements: data_ptr as *mut T,
             length,
-            capacity_or_alloc_ptr: length << 1,
+            capacity_or_alloc_ptr: shifted_capacity(length),
         }
     }
 
     /// Create a RocList from a slice, copying elements into a new allocation.
-    pub fn from_slice(slice: &[T], roc_host: &RocHost) -> Self where T: Copy {
+    ///
+    /// # Safety
+    /// This is a shallow copy. For element types that own Roc references, the
+    /// caller must ensure each copied element is already retained for the new
+    /// list or will not be decref'd through another owner.
+    pub unsafe fn from_slice(slice: &[T], roc_host: &RocHost) -> Self where T: Copy {
         if slice.is_empty() {
             return Self::empty();
         }
-        let list = Self::allocate(slice.len(), roc_host);
+        let list = unsafe { Self::allocate(slice.len(), roc_host) };
         unsafe {
             core::ptr::copy_nonoverlapping(
                 slice.as_ptr(),
@@ -640,8 +830,18 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
         list
     }
 
-    /// Decrement the reference count; frees the allocation when it reaches zero.
-    pub fn decref(&self, roc_host: &RocHost) {
+    /// Drop this reference to the list allocation, freeing it when this was the
+    /// last one.
+    ///
+    /// Shallow: it never touches the elements. To release an owned list whose
+    /// elements are refcounted, call that list's generated `decref_list_of_...`
+    /// helper instead, which drops the elements when this reference is the last
+    /// one and then calls this.
+    ///
+    /// # Safety
+    /// `self` must own one live Roc list reference. Calling this more than once
+    /// for the same ownership reference may double-free.
+    pub unsafe fn decref(self, roc_host: &RocHost) {
         if self.elements.is_null() {
             return;
         }
@@ -651,21 +851,33 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
         }
         let align = core::mem::align_of::<T>().max(core::mem::align_of::<usize>());
         let header_bytes = Self::header_bytes();
-        unsafe {
-            let rc = (alloc_ptr as *mut AtomicIsize).sub(1);
-            if (*rc).load(Ordering::Relaxed) == 0 {
-                return; // REFCOUNT_STATIC_DATA — elements are in read-only memory
-            }
-            let prev = (*rc).fetch_sub(1, Ordering::Relaxed);
-            if prev == 1 {
-                let base = alloc_ptr.sub(header_bytes) as *mut c_void;
+        let rc = unsafe { (alloc_ptr as *mut AtomicIsize).sub(1) };
+        if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+            return; // REFCOUNT_STATIC_DATA—elements are in read-only memory
+        }
+        let prev = unsafe { (*rc).fetch_sub(1, Ordering::Release) };
+        if prev == 1 {
+            fence(Ordering::Acquire);
+            let base = unsafe { alloc_ptr.sub(header_bytes) } as *mut c_void;
+            unsafe {
                 roc_host.dealloc(base, align);
             }
         }
     }
 
-    /// Increment the reference count by `amount`.
-    pub fn incref(&self, amount: isize) {
+    /// Recursively release this list and its elements.
+    ///
+    /// The reference-count decrement claims the final reference atomically
+    /// before reading any elements, so concurrent releases cannot skip or
+    /// duplicate element teardown.
+    ///
+    /// # Safety
+    /// `self` must own one live Roc list reference, and `P` must exactly
+    /// describe how Roc releases one initialized `T` element.
+    pub unsafe fn release_with<P>(self, roc_host: &RocHost)
+    where
+        P: RocRelease<T>,
+    {
         if self.elements.is_null() {
             return;
         }
@@ -673,11 +885,44 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
         if alloc_ptr.is_null() {
             return;
         }
-        unsafe {
-            let rc = (alloc_ptr as *mut AtomicIsize).sub(1);
-            if (*rc).load(Ordering::Relaxed) == 0 {
-                return; // REFCOUNT_STATIC_DATA
+        let align = core::mem::align_of::<T>().max(core::mem::align_of::<usize>());
+        let header_bytes = Self::header_bytes();
+        let rc = unsafe { (alloc_ptr as *mut AtomicIsize).sub(1) };
+        if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+            return; // REFCOUNT_STATIC_DATA—elements are in read-only memory
+        }
+        let prev = unsafe { (*rc).fetch_sub(1, Ordering::Release) };
+        if prev == 1 {
+            fence(Ordering::Acquire);
+            if ELEMENTS_REFCOUNTED {
+                for item_ref in self.allocation_items() {
+                    let item = unsafe { core::ptr::read(item_ref) };
+                    unsafe { P::release(item, roc_host); }
+                }
             }
+            let base = unsafe { alloc_ptr.sub(header_bytes) } as *mut c_void;
+            unsafe { roc_host.dealloc(base, align); }
+        }
+    }
+
+    /// Increment the reference count by `amount`.
+    ///
+    /// # Safety
+    /// `self` must point at a live Roc list allocation. The retained references
+    /// must be balanced by later decrefs.
+    pub unsafe fn incref(self, amount: isize) {
+        if self.elements.is_null() {
+            return;
+        }
+        let alloc_ptr = self.get_allocation_ptr();
+        if alloc_ptr.is_null() {
+            return;
+        }
+        let rc = unsafe { (alloc_ptr as *mut AtomicIsize).sub(1) };
+        if unsafe { (*rc).load(Ordering::Relaxed) } == 0 {
+            return; // REFCOUNT_STATIC_DATA
+        }
+        unsafe {
             (*rc).fetch_add(amount, Ordering::Relaxed);
         }
     }
@@ -690,7 +935,7 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
         }
         unsafe {
             let rc = (alloc_ptr as *const AtomicIsize).sub(1);
-            let count = (*rc).load(Ordering::Relaxed);
+            let count = (*rc).load(Ordering::Acquire);
             count == 0 || count == 1
         }
     }
@@ -703,7 +948,7 @@ impl<T, const ELEMENTS_REFCOUNTED: bool> RocListWith<T, ELEMENTS_REFCOUNTED> {
         }
         unsafe {
             let rc = (alloc_ptr as *const AtomicIsize).sub(1);
-            (*rc).load(Ordering::Relaxed) == 1
+            (*rc).load(Ordering::Acquire) == 1
         }
     }
 }
@@ -714,109 +959,456 @@ impl<T: core::fmt::Debug, const ELEMENTS_REFCOUNTED: bool> core::fmt::Debug for 
     }
 }
 
+/// Statically describes how to release one owned Roc ABI value of type `T`.
+///
+/// # Safety
+/// Implementations must match Roc's exact allocation and nested ownership layout.
+pub unsafe trait RocRelease<T> {
+    unsafe fn release(value: T, roc_host: &RocHost);
+}
+
+/// An owning host-language wrapper around a value returned by Roc.
+///
+/// The release policy is zero-sized, so this wrapper adds no runtime metadata.
+/// Dropping it recursively releases the value through the host's direct Roc
+/// runtime symbols. Use `into_raw` to transfer ownership elsewhere.
+#[repr(transparent)]
+pub struct RocOwned<T, P: RocRelease<T>> {
+    value: core::mem::ManuallyDrop<T>,
+    policy: core::marker::PhantomData<P>,
+}
+
+impl<T, P: RocRelease<T>> RocOwned<T, P> {
+    /// Take ownership of a raw value returned by a Roc-provided entrypoint.
+    ///
+    /// # Safety
+    /// `value` must be one live owned result whose concrete release plan is `P`.
+    pub unsafe fn from_raw(value: T) -> Self {
+        Self { value: core::mem::ManuallyDrop::new(value), policy: core::marker::PhantomData }
+    }
+
+    pub fn as_ref(&self) -> &T {
+        &self.value
+    }
+
+    /// Transfer ownership back to raw host code without releasing the value.
+    pub fn into_raw(self) -> T {
+        let mut this = core::mem::ManuallyDrop::new(self);
+        unsafe { core::mem::ManuallyDrop::take(&mut this.value) }
+    }
+}
+
+impl<T, P: RocRelease<T>> core::ops::Deref for RocOwned<T, P> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.as_ref()
+    }
+}
+
+impl<T, P: RocRelease<T>> Drop for RocOwned<T, P> {
+    fn drop(&mut self) {
+        let value = unsafe { core::mem::ManuallyDrop::take(&mut self.value) };
+        let roc_host = direct_roc_host();
+        unsafe { P::release(value, &roc_host); }
+    }
+}
+
+pub struct RocNoopRelease;
+
+unsafe impl<T> RocRelease<T> for RocNoopRelease {
+    unsafe fn release(_value: T, _roc_host: &RocHost) {}
+}
+
+pub struct RocStrRelease;
+
+unsafe impl RocRelease<RocStr> for RocStrRelease {
+    unsafe fn release(value: RocStr, roc_host: &RocHost) {
+        unsafe { value.decref(roc_host); }
+    }
+}
+
+pub struct RocListRelease<P>(core::marker::PhantomData<P>);
+
+unsafe impl<T, P> RocRelease<RocListWith<T, true>> for RocListRelease<P>
+where
+    P: RocRelease<T>,
+{
+    unsafe fn release(value: RocListWith<T, true>, roc_host: &RocHost) {
+        unsafe { value.release_with::<P>(roc_host); }
+    }
+}
+
+pub struct RocListSpineRelease;
+
+unsafe impl<T> RocRelease<RocListWith<T, false>> for RocListSpineRelease {
+    unsafe fn release(value: RocListWith<T, false>, roc_host: &RocHost) {
+        unsafe { value.decref(roc_host); }
+    }
+}
+
+pub struct RocErasedCallableRelease;
+
+unsafe impl RocRelease<RocErasedCallable> for RocErasedCallableRelease {
+    unsafe fn release(value: RocErasedCallable, roc_host: &RocHost) {
+        unsafe { decref_erased_callable(value, roc_host); }
+    }
+}
+
+pub struct RocBoxRelease<T, P>(core::marker::PhantomData<(T, P)>);
+
+extern "C" fn release_box_payload<T, P>(data_ptr: *mut c_void, roc_host: *mut RocHost)
+where
+    P: RocRelease<T>,
+{
+    if data_ptr.is_null() || roc_host.is_null() {
+        return;
+    }
+    let value = unsafe { core::ptr::read(data_ptr as *const T) };
+    unsafe { P::release(value, &*roc_host); }
+}
+
+unsafe impl<T, P> RocRelease<*mut T> for RocBoxRelease<T, P>
+where
+    P: RocRelease<T>,
+{
+    unsafe fn release(value: *mut T, roc_host: &RocHost) {
+        unsafe {
+            decref_box_with(
+                value as RocBox,
+                core::mem::align_of::<T>(),
+                true,
+                Some(release_box_payload::<T, P>),
+                roc_host,
+            );
+        }
+    }
+}
+
+pub struct RocBoxSpineRelease<T>(core::marker::PhantomData<T>);
+
+unsafe impl<T> RocRelease<*mut T> for RocBoxSpineRelease<T> {
+    unsafe fn release(value: *mut T, roc_host: &RocHost) {
+        unsafe {
+            decref_box_with(
+                value as RocBox,
+                core::mem::align_of::<T>(),
+                false,
+                None,
+                roc_host,
+            );
+        }
+    }
+}
+
 /// Tag discriminant for Try.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TryType0Tag {
+pub enum HostStderrLineResultTag {
     Err = 0,
     Ok = 1,
 }
 
-/// Tag union: Try
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct TryType0 {
-    pub payload: TryType0Payload,
-    pub tag: TryType0Tag,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union TryType0Payload {
+pub union HostStderrLineResultPayload {
     pub err: core::mem::ManuallyDrop<RocStr>,
-    pub ok: core::mem::ManuallyDrop<()>,
+    pub ok: [u8; 0],
 }
 
-const _: () = assert!(core::mem::size_of::<TryType0>() == 32, "TryType0 size mismatch");
-const _: () = assert!(core::mem::align_of::<TryType0>() == 8, "TryType0 alignment mismatch");
+#[cfg(target_pointer_width = "32")]
+#[repr(align(4))]
+#[derive(Clone, Copy)]
+pub struct HostStderrLineResultPayloadAlignment;
+
+/// Tag union: Try
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HostStderrLineResult {
+    pub _payload_alignment: [HostStderrLineResultPayloadAlignment; 0],
+    pub payload: [u8; 12],
+    pub tag: HostStderrLineResultTag,
+}
+
+/// Tag union: Try
+#[cfg(not(target_pointer_width = "32"))]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HostStderrLineResult {
+    pub payload: HostStderrLineResultPayload,
+    pub tag: HostStderrLineResultTag,
+}
+
+impl HostStderrLineResult {
+    /// Borrow the `Err` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStderrLineResultTag::Err` and the payload must still be initialized.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn borrow_payload_err_unchecked(&self) -> &RocStr {
+        unsafe { &*(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Borrow the `Err` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStderrLineResultTag::Err` and the payload must still be initialized.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn borrow_payload_err_unchecked(&self) -> &RocStr {
+        unsafe { &*(&self.payload.err as *const core::mem::ManuallyDrop<RocStr> as *const RocStr) }
+    }
+
+    /// Move the `Err` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStderrLineResultTag::Err`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn take_payload_err_unchecked(&mut self) -> RocStr {
+        unsafe { core::ptr::read(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Move the `Err` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStderrLineResultTag::Err`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn take_payload_err_unchecked(&mut self) -> RocStr {
+        unsafe { core::mem::ManuallyDrop::take(&mut self.payload.err) }
+    }
+
+}
+
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<HostStderrLineResult>() == 32, "HostStderrLineResult size mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::align_of::<HostStderrLineResult>() == 8, "HostStderrLineResult alignment mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(HostStderrLineResult, tag) == 24, "HostStderrLineResult tag offset mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::size_of::<HostStderrLineResult>() == 16, "HostStderrLineResult size mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::align_of::<HostStderrLineResult>() == 4, "HostStderrLineResult alignment mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(HostStderrLineResult, tag) == 12, "HostStderrLineResult tag offset mismatch");
 
 /// Tag discriminant for Try.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TryType4Tag {
+pub enum HostStdinLineResultTag {
     Err = 0,
     Ok = 1,
 }
 
-/// Tag union: Try
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct TryType4 {
-    pub payload: TryType4Payload,
-    pub tag: TryType4Tag,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union TryType4Payload {
+pub union HostStdinLineResultPayload {
     pub err: core::mem::ManuallyDrop<RocStr>,
     pub ok: core::mem::ManuallyDrop<RocStr>,
 }
 
-const _: () = assert!(core::mem::size_of::<TryType4>() == 32, "TryType4 size mismatch");
-const _: () = assert!(core::mem::align_of::<TryType4>() == 8, "TryType4 alignment mismatch");
+#[cfg(target_pointer_width = "32")]
+#[repr(align(4))]
+#[derive(Clone, Copy)]
+pub struct HostStdinLineResultPayloadAlignment;
+
+/// Tag union: Try
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HostStdinLineResult {
+    pub _payload_alignment: [HostStdinLineResultPayloadAlignment; 0],
+    pub payload: [u8; 12],
+    pub tag: HostStdinLineResultTag,
+}
+
+/// Tag union: Try
+#[cfg(not(target_pointer_width = "32"))]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HostStdinLineResult {
+    pub payload: HostStdinLineResultPayload,
+    pub tag: HostStdinLineResultTag,
+}
+
+impl HostStdinLineResult {
+    /// Borrow the `Err` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Err` and the payload must still be initialized.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn borrow_payload_err_unchecked(&self) -> &RocStr {
+        unsafe { &*(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Borrow the `Err` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Err` and the payload must still be initialized.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn borrow_payload_err_unchecked(&self) -> &RocStr {
+        unsafe { &*(&self.payload.err as *const core::mem::ManuallyDrop<RocStr> as *const RocStr) }
+    }
+
+    /// Move the `Err` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Err`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn take_payload_err_unchecked(&mut self) -> RocStr {
+        unsafe { core::ptr::read(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Move the `Err` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Err`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn take_payload_err_unchecked(&mut self) -> RocStr {
+        unsafe { core::mem::ManuallyDrop::take(&mut self.payload.err) }
+    }
+
+    /// Borrow the `Ok` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Ok` and the payload must still be initialized.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn borrow_payload_ok_unchecked(&self) -> &RocStr {
+        unsafe { &*(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Borrow the `Ok` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Ok` and the payload must still be initialized.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn borrow_payload_ok_unchecked(&self) -> &RocStr {
+        unsafe { &*(&self.payload.ok as *const core::mem::ManuallyDrop<RocStr> as *const RocStr) }
+    }
+
+    /// Move the `Ok` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Ok`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn take_payload_ok_unchecked(&mut self) -> RocStr {
+        unsafe { core::ptr::read(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Move the `Ok` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdinLineResultTag::Ok`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn take_payload_ok_unchecked(&mut self) -> RocStr {
+        unsafe { core::mem::ManuallyDrop::take(&mut self.payload.ok) }
+    }
+
+}
+
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<HostStdinLineResult>() == 32, "HostStdinLineResult size mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::align_of::<HostStdinLineResult>() == 8, "HostStdinLineResult alignment mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(HostStdinLineResult, tag) == 24, "HostStdinLineResult tag offset mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::size_of::<HostStdinLineResult>() == 16, "HostStdinLineResult size mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::align_of::<HostStdinLineResult>() == 4, "HostStdinLineResult alignment mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(HostStdinLineResult, tag) == 12, "HostStdinLineResult tag offset mismatch");
 
 /// Tag discriminant for Try.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TryType6Tag {
+pub enum HostStdoutLineResultTag {
     Err = 0,
     Ok = 1,
 }
 
-/// Tag union: Try
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct TryType6 {
-    pub payload: TryType6Payload,
-    pub tag: TryType6Tag,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union TryType6Payload {
+pub union HostStdoutLineResultPayload {
     pub err: core::mem::ManuallyDrop<RocStr>,
-    pub ok: core::mem::ManuallyDrop<()>,
+    pub ok: [u8; 0],
 }
 
-const _: () = assert!(core::mem::size_of::<TryType6>() == 32, "TryType6 size mismatch");
-const _: () = assert!(core::mem::align_of::<TryType6>() == 8, "TryType6 alignment mismatch");
+#[cfg(target_pointer_width = "32")]
+#[repr(align(4))]
+#[derive(Clone, Copy)]
+pub struct HostStdoutLineResultPayloadAlignment;
 
-/// Tag discriminant for Try.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TryType11Tag {
-    Err = 0,
-    Ok = 1,
+/// Tag union: Try
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HostStdoutLineResult {
+    pub _payload_alignment: [HostStdoutLineResultPayloadAlignment; 0],
+    pub payload: [u8; 12],
+    pub tag: HostStdoutLineResultTag,
 }
 
 /// Tag union: Try
+#[cfg(not(target_pointer_width = "32"))]
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct TryType11 {
-    pub payload: TryType11Payload,
-    pub tag: TryType11Tag,
+pub struct HostStdoutLineResult {
+    pub payload: HostStdoutLineResultPayload,
+    pub tag: HostStdoutLineResultTag,
 }
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union TryType11Payload {
-    pub err: core::mem::ManuallyDrop<i32>,
-    pub ok: core::mem::ManuallyDrop<()>,
+impl HostStdoutLineResult {
+    /// Borrow the `Err` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdoutLineResultTag::Err` and the payload must still be initialized.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn borrow_payload_err_unchecked(&self) -> &RocStr {
+        unsafe { &*(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Borrow the `Err` payload without creating another owner.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdoutLineResultTag::Err` and the payload must still be initialized.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn borrow_payload_err_unchecked(&self) -> &RocStr {
+        unsafe { &*(&self.payload.err as *const core::mem::ManuallyDrop<RocStr> as *const RocStr) }
+    }
+
+    /// Move the `Err` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdoutLineResultTag::Err`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn take_payload_err_unchecked(&mut self) -> RocStr {
+        unsafe { core::ptr::read(self.payload.as_ptr() as *const RocStr) }
+    }
+
+    /// Move the `Err` payload out of one owned tag-union shell.
+    ///
+    /// # Safety
+    /// `self.tag` must be `HostStdoutLineResultTag::Err`. After this call, `self` is logically uninitialized and must not be read or destroyed.
+    #[cfg(not(target_pointer_width = "32"))]
+    pub unsafe fn take_payload_err_unchecked(&mut self) -> RocStr {
+        unsafe { core::mem::ManuallyDrop::take(&mut self.payload.err) }
+    }
+
 }
 
-const _: () = assert!(core::mem::size_of::<TryType11>() == 8, "TryType11 size mismatch");
-const _: () = assert!(core::mem::align_of::<TryType11>() == 4, "TryType11 alignment mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<HostStdoutLineResult>() == 32, "HostStdoutLineResult size mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::align_of::<HostStdoutLineResult>() == 8, "HostStdoutLineResult alignment mismatch");
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(HostStdoutLineResult, tag) == 24, "HostStdoutLineResult tag offset mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::size_of::<HostStdoutLineResult>() == 16, "HostStdoutLineResult size mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::align_of::<HostStdoutLineResult>() == 4, "HostStdoutLineResult alignment mismatch");
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::offset_of!(HostStdoutLineResult, tag) == 12, "HostStdoutLineResult tag offset mismatch");
 
 /// Arguments for Host.stderr_line!
 /// Roc signature: Str => Try({}, [StderrErr(Str)])
@@ -836,157 +1428,238 @@ pub struct HostStdoutLineArgs {
     pub arg0: RocStr,
 }
 
-// =============================================================================
-// Semantic Type Aliases
-// =============================================================================
-
-pub type HostStderrLineResult = TryType0;
-pub type HostStderrLineResultPayload = TryType0Payload;
-pub type HostStderrLineResultTag = TryType0Tag;
-pub type HostStdinLineResult = TryType4;
-pub type HostStdinLineResultPayload = TryType4Payload;
-pub type HostStdinLineResultTag = TryType4Tag;
-pub type HostStdoutLineResult = TryType6;
-pub type HostStdoutLineResultPayload = TryType6Payload;
-pub type HostStdoutLineResultTag = TryType6Tag;
-
-// =============================================================================
 // Generated Refcount Helpers
-// =============================================================================
 
-/// Recursively decrement Roc-owned payloads in TryType0.
-pub fn decref_try_type0(value: TryType0, roc_host: &RocHost) {
-    let _ = roc_host;
-    match value.tag {
-        TryType0Tag::Err => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.err);
-            payload.decref(roc_host);
-        },
-        TryType0Tag::Ok => {},
+impl HostStderrLineResult {
+    /// Recursively decrement Roc-owned payloads.
+    ///
+    /// # Safety
+    /// `self` must own one live Roc reference for each refcounted payload.
+    pub unsafe fn decref(self, roc_host: &RocHost) {
+        let mut value = self;
+        let _ = roc_host;
+        match value.tag {
+            HostStderrLineResultTag::Err => {
+                let payload = unsafe { value.take_payload_err_unchecked() };
+                unsafe { payload.decref(roc_host); }
+            },
+            HostStderrLineResultTag::Ok => {},
+        }
+    }
+
+    /// Increment Roc-owned payloads.
+    ///
+    /// # Safety
+    /// `self` must point at live Roc allocations. The retained references must
+    /// be balanced by later decrefs.
+    pub unsafe fn incref(self, amount: isize) {
+        let value = self;
+        let _ = amount;
+        match value.tag {
+            HostStderrLineResultTag::Err => {
+                let payload = unsafe { core::ptr::read(value.borrow_payload_err_unchecked()) };
+                unsafe { payload.incref(amount); }
+            },
+            HostStderrLineResultTag::Ok => {},
+        }
     }
 }
 
-/// Increment Roc-owned payloads in TryType0.
-pub fn incref_try_type0(value: TryType0, amount: isize) {
-    let _ = amount;
-    match value.tag {
-        TryType0Tag::Err => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.err);
-            payload.incref(amount);
-        },
-        TryType0Tag::Ok => {},
+pub struct HostStderrLineResultRelease;
+
+unsafe impl RocRelease<HostStderrLineResult> for HostStderrLineResultRelease {
+    unsafe fn release(value: HostStderrLineResult, roc_host: &RocHost) {
+        unsafe { value.decref(roc_host); }
     }
 }
 
-/// Recursively decrement Roc-owned payloads in TryType4.
-pub fn decref_try_type4(value: TryType4, roc_host: &RocHost) {
-    let _ = roc_host;
-    match value.tag {
-        TryType4Tag::Err => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.err);
-            payload.decref(roc_host);
-        },
-        TryType4Tag::Ok => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.ok);
-            payload.decref(roc_host);
-        },
+impl HostStdinLineResult {
+    /// Recursively decrement Roc-owned payloads.
+    ///
+    /// # Safety
+    /// `self` must own one live Roc reference for each refcounted payload.
+    pub unsafe fn decref(self, roc_host: &RocHost) {
+        let mut value = self;
+        let _ = roc_host;
+        match value.tag {
+            HostStdinLineResultTag::Err => {
+                let payload = unsafe { value.take_payload_err_unchecked() };
+                unsafe { payload.decref(roc_host); }
+            },
+            HostStdinLineResultTag::Ok => {
+                let payload = unsafe { value.take_payload_ok_unchecked() };
+                unsafe { payload.decref(roc_host); }
+            },
+        }
+    }
+
+    /// Increment Roc-owned payloads.
+    ///
+    /// # Safety
+    /// `self` must point at live Roc allocations. The retained references must
+    /// be balanced by later decrefs.
+    pub unsafe fn incref(self, amount: isize) {
+        let value = self;
+        let _ = amount;
+        match value.tag {
+            HostStdinLineResultTag::Err => {
+                let payload = unsafe { core::ptr::read(value.borrow_payload_err_unchecked()) };
+                unsafe { payload.incref(amount); }
+            },
+            HostStdinLineResultTag::Ok => {
+                let payload = unsafe { core::ptr::read(value.borrow_payload_ok_unchecked()) };
+                unsafe { payload.incref(amount); }
+            },
+        }
     }
 }
 
-/// Increment Roc-owned payloads in TryType4.
-pub fn incref_try_type4(value: TryType4, amount: isize) {
-    let _ = amount;
-    match value.tag {
-        TryType4Tag::Err => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.err);
-            payload.incref(amount);
-        },
-        TryType4Tag::Ok => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.ok);
-            payload.incref(amount);
-        },
+pub struct HostStdinLineResultRelease;
+
+unsafe impl RocRelease<HostStdinLineResult> for HostStdinLineResultRelease {
+    unsafe fn release(value: HostStdinLineResult, roc_host: &RocHost) {
+        unsafe { value.decref(roc_host); }
     }
 }
 
-/// Recursively decrement Roc-owned payloads in TryType6.
-pub fn decref_try_type6(value: TryType6, roc_host: &RocHost) {
-    let _ = roc_host;
-    match value.tag {
-        TryType6Tag::Err => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.err);
-            payload.decref(roc_host);
-        },
-        TryType6Tag::Ok => {},
+impl HostStdoutLineResult {
+    /// Recursively decrement Roc-owned payloads.
+    ///
+    /// # Safety
+    /// `self` must own one live Roc reference for each refcounted payload.
+    pub unsafe fn decref(self, roc_host: &RocHost) {
+        let mut value = self;
+        let _ = roc_host;
+        match value.tag {
+            HostStdoutLineResultTag::Err => {
+                let payload = unsafe { value.take_payload_err_unchecked() };
+                unsafe { payload.decref(roc_host); }
+            },
+            HostStdoutLineResultTag::Ok => {},
+        }
+    }
+
+    /// Increment Roc-owned payloads.
+    ///
+    /// # Safety
+    /// `self` must point at live Roc allocations. The retained references must
+    /// be balanced by later decrefs.
+    pub unsafe fn incref(self, amount: isize) {
+        let value = self;
+        let _ = amount;
+        match value.tag {
+            HostStdoutLineResultTag::Err => {
+                let payload = unsafe { core::ptr::read(value.borrow_payload_err_unchecked()) };
+                unsafe { payload.incref(amount); }
+            },
+            HostStdoutLineResultTag::Ok => {},
+        }
     }
 }
 
-/// Increment Roc-owned payloads in TryType6.
-pub fn incref_try_type6(value: TryType6, amount: isize) {
-    let _ = amount;
-    match value.tag {
-        TryType6Tag::Err => unsafe {
-            let payload = core::mem::ManuallyDrop::into_inner(value.payload.err);
-            payload.incref(amount);
-        },
-        TryType6Tag::Ok => {},
+pub struct HostStdoutLineResultRelease;
+
+unsafe impl RocRelease<HostStdoutLineResult> for HostStdoutLineResultRelease {
+    unsafe fn release(value: HostStdoutLineResult, roc_host: &RocHost) {
+        unsafe { value.decref(roc_host); }
     }
 }
 
-/// Recursively decrement Roc-owned payloads in TryType11.
-pub fn decref_try_type11(value: TryType11, roc_host: &RocHost) {
-    let _ = roc_host;
-    match value.tag {
-        TryType11Tag::Err => {},
-        TryType11Tag::Ok => {},
-    }
-}
-
-/// Increment Roc-owned payloads in TryType11.
-pub fn incref_try_type11(value: TryType11, amount: isize) {
-    let _ = amount;
-    match value.tag {
-        TryType11Tag::Err => {},
-        TryType11Tag::Ok => {},
-    }
+/// Release one owned reference to a `RocList<RocStr>`.
+///
+/// The allocation's final reference is claimed atomically before any element
+/// is read, so concurrent owners cannot skip or duplicate element teardown.
+///
+/// # Safety
+/// `value` must own one live Roc list reference.
+pub unsafe fn decref_list_of_str(value: RocList<RocStr>, roc_host: &RocHost) {
+    unsafe { value.release_with::<RocStrRelease>(roc_host); }
 }
 
 
-// =============================================================================
 // Runtime Symbols
 //
 // The host defines these linker symbols. Compiled Roc code calls them directly.
-// =============================================================================
 
 #[allow(improper_ctypes)]
 unsafe extern "C" {
-    pub fn roc_alloc(length: usize, alignment: usize) -> *mut c_void;
+    /// Returns `length` bytes aligned to `alignment`. Never returns null: Roc writes through
+    /// the result without checking it, so a host that cannot allocate must stop the Roc
+    /// program and not return, exactly as `roc_crashed` does.
+    pub fn roc_alloc(length: usize, alignment: usize) -> NonNull<c_void>;
     pub fn roc_dealloc(ptr: *mut c_void, alignment: usize);
-    pub fn roc_realloc(ptr: *mut c_void, new_length: usize, alignment: usize) -> *mut c_void;
+    /// Never returns null, under the same rule as `roc_alloc`.
+    pub fn roc_realloc(ptr: *mut c_void, new_length: usize, alignment: usize) -> NonNull<c_void>;
     pub fn roc_dbg(bytes: *const u8, len: usize);
     pub fn roc_expect_failed(bytes: *const u8, len: usize);
+    /// Must never return: end the process. Roc code traps right after this
+    /// call, so returning terminates the process.
     pub fn roc_crashed(bytes: *const u8, len: usize);
 }
 
-// =============================================================================
+extern "C" fn direct_roc_alloc(_host: *mut RocHost, length: usize, alignment: usize) -> NonNull<c_void> {
+    unsafe { roc_alloc(length, alignment) }
+}
+
+extern "C" fn direct_roc_dealloc(_host: *mut RocHost, ptr: *mut c_void, alignment: usize) {
+    unsafe { roc_dealloc(ptr, alignment); }
+}
+
+extern "C" fn direct_roc_realloc(_host: *mut RocHost, ptr: *mut c_void, new_length: usize, alignment: usize) -> NonNull<c_void> {
+    unsafe { roc_realloc(ptr, new_length, alignment) }
+}
+
+extern "C" fn direct_roc_dbg(_host: *mut RocHost, bytes: *const u8, len: usize) {
+    unsafe { roc_dbg(bytes, len); }
+}
+
+extern "C" fn direct_roc_expect_failed(_host: *mut RocHost, bytes: *const u8, len: usize) {
+    unsafe { roc_expect_failed(bytes, len); }
+}
+
+extern "C" fn direct_roc_crashed(_host: *mut RocHost, bytes: *const u8, len: usize) {
+    unsafe { roc_crashed(bytes, len); }
+}
+
+fn direct_roc_host() -> RocHost {
+    RocHost {
+        env: core::ptr::null_mut(),
+        roc_alloc: direct_roc_alloc,
+        roc_dealloc: direct_roc_dealloc,
+        roc_realloc: direct_roc_realloc,
+        roc_dbg: direct_roc_dbg,
+        roc_expect_failed: direct_roc_expect_failed,
+        roc_crashed: direct_roc_crashed,
+    }
+}
+
 // Hosted Symbols
 //
 // The platform host must export these symbols with the exact direct C ABI signatures.
 // Refcounted arguments are owned by the hosted function.
-// =============================================================================
 
 #[allow(improper_ctypes)]
 unsafe extern "C" {
     /// Hosted symbol for Host.stderr_line!
     /// Roc signature: Str => Try({}, [StderrErr(Str)])
-    pub fn roc_stderr_line(arg0: RocStr) -> TryType0;
+    /// Owned arguments. Release each exactly once before returning, unless it is
+    /// moved into storage or into the result:
+    ///     unsafe { arg0.decref(roc_host); }
+    /// The result is owned by Roc: return exactly one owned reference.
+    pub fn roc_stderr_line(arg0: RocStr) -> HostStderrLineResult;
 
     /// Hosted symbol for Host.stdin_line!
     /// Roc signature: {} => Try(Str, [StdinErr(Str)])
-    pub fn roc_stdin_line() -> TryType4;
+    /// The result is owned by Roc: return exactly one owned reference.
+    pub fn roc_stdin_line() -> HostStdinLineResult;
 
     /// Hosted symbol for Host.stdout_line!
     /// Roc signature: Str => Try({}, [StdoutErr(Str)])
-    pub fn roc_stdout_line(arg0: RocStr) -> TryType6;
+    /// Owned arguments. Release each exactly once before returning, unless it is
+    /// moved into storage or into the result:
+    ///     unsafe { arg0.decref(roc_host); }
+    /// The result is owned by Roc: return exactly one owned reference.
+    pub fn roc_stdout_line(arg0: RocStr) -> HostStdoutLineResult;
 
 }
 
@@ -994,15 +1667,17 @@ unsafe extern "C" {
 ///
 /// Memory layout: each allocation prepends size metadata so that dealloc/realloc
 /// can recover the original allocation size because `roc_dealloc` receives no length.
+#[cfg(not(no_roc_std_helpers))]
 pub struct DefaultAllocators;
 
+#[cfg(not(no_roc_std_helpers))]
 impl DefaultAllocators {
     /// Allocate memory using the Rust global allocator.
-    pub extern "C" fn roc_alloc(_roc_host: *mut RocHost, length: usize, alignment: usize) -> *mut c_void {
+    pub extern "C" fn roc_alloc(_roc_host: *mut RocHost, length: usize, alignment: usize) -> NonNull<c_void> {
         unsafe {
             let min_alignment = alignment.max(core::mem::align_of::<usize>());
             let size_storage_bytes = min_alignment;
-            let total_size = length + size_storage_bytes;
+            let total_size = checked_add_usize(length, size_storage_bytes, "roc_alloc allocation size overflow");
 
             debug_assert!(min_alignment.is_power_of_two(), "alignment must be a power of two");
             let layout = Layout::from_size_align_unchecked(total_size, min_alignment);
@@ -1015,7 +1690,7 @@ impl DefaultAllocators {
             let size_ptr = base_ptr.add(size_storage_bytes).sub(core::mem::size_of::<usize>()) as *mut usize;
             *size_ptr = total_size;
 
-            base_ptr.add(size_storage_bytes) as *mut c_void
+            NonNull::new_unchecked(base_ptr.add(size_storage_bytes) as *mut c_void)
         }
     }
 
@@ -1036,7 +1711,7 @@ impl DefaultAllocators {
     }
 
     /// Reallocate memory, preserving existing user data.
-    pub extern "C" fn roc_realloc(_roc_host: *mut RocHost, ptr: *mut c_void, new_length: usize, alignment: usize) -> *mut c_void {
+    pub extern "C" fn roc_realloc(_roc_host: *mut RocHost, ptr: *mut c_void, new_length: usize, alignment: usize) -> NonNull<c_void> {
         unsafe {
             let min_alignment = alignment.max(core::mem::align_of::<usize>());
             let size_storage_bytes = min_alignment;
@@ -1045,7 +1720,7 @@ impl DefaultAllocators {
             let old_total_size = *old_size_ptr;
             let old_base_ptr = (ptr as *mut u8).sub(size_storage_bytes);
 
-            let new_total_size = new_length + size_storage_bytes;
+            let new_total_size = checked_add_usize(new_length, size_storage_bytes, "roc_realloc allocation size overflow");
             debug_assert!(min_alignment.is_power_of_two(), "alignment must be a power of two");
             let old_layout = Layout::from_size_align_unchecked(old_total_size, min_alignment);
             let new_base_ptr = std::alloc::realloc(old_base_ptr, old_layout, new_total_size);
@@ -1057,14 +1732,16 @@ impl DefaultAllocators {
             let new_user_ptr = new_base_ptr.add(size_storage_bytes);
             let new_size_ptr = new_user_ptr.sub(core::mem::size_of::<usize>()) as *mut usize;
             *new_size_ptr = new_total_size;
-            new_user_ptr as *mut c_void
+            NonNull::new_unchecked(new_user_ptr as *mut c_void)
         }
     }
 }
 
 /// Default handlers for dbg, expect-failed, and crash.
+#[cfg(not(no_roc_std_helpers))]
 pub struct DefaultHandlers;
 
+#[cfg(not(no_roc_std_helpers))]
 impl DefaultHandlers {
     /// Print a `dbg` expression to stderr.
     pub extern "C" fn roc_dbg(_roc_host: *mut RocHost, bytes: *const u8, len: usize) {
@@ -1099,6 +1776,7 @@ impl DefaultHandlers {
 ///
 /// This is only for helper functions in this generated file. It is not passed to
 /// compiled Roc code, which uses the direct symbol ABI declared above.
+#[cfg(not(no_roc_std_helpers))]
 pub fn make_roc_host(env: *mut c_void) -> RocHost {
     RocHost {
         env,
@@ -1111,11 +1789,9 @@ pub fn make_roc_host(env: *mut c_void) -> RocHost {
     }
 }
 
-// =============================================================================
 // Provided Symbols
 //
 // Roc exports these symbols from the app with their natural C ABI signatures.
-// =============================================================================
 
 #[allow(improper_ctypes)]
 unsafe extern "C" {

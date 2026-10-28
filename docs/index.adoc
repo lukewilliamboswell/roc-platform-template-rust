@@ -1,0 +1,27 @@
+= Roc platform template for Rust
+Luke Boswell
+:doctype: book
+:toc: left
+
+Build a native Roc platform with a Rust host. Start with the released examples
+if you want to write a Roc application. Start with the contributor chapter if
+you want to change the host or the platform interface.
+
+The https://github.com/lukewilliamboswell/roc-platform-template-rust/releases/latest[latest release]
+contains a platform bundle and examples that name that exact bundle.
+The https://lukewilliamboswell.github.io/roc-platform-template-rust/[API reference] describes the latest published platform;
+this manual describes repository maintenance at version {docs-version}.
+
+include::getting-started.adoc[leveloffset=+1]
+
+include::platform.adoc[leveloffset=+1]
+
+include::contributing.adoc[leveloffset=+1]
+
+include::linker-inputs.adoc[leveloffset=+1]
+
+include::releasing.adoc[leveloffset=+1]
+
+include::security.adoc[leveloffset=+1]
+
+include::releases.adoc[leveloffset=+1]

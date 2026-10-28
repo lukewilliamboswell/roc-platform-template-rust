@@ -12,11 +12,22 @@ import cli.Env
 import cli.OsStr
 import cli.Path
 import src/Files
+import src/RocSource
 import src/Script
 
-main! = |_args| {
+main! = |args| {
+	static_only = match args.map(OsStr.display) {
+		[] => Bool.False
+		["--static-only"] => Bool.True
+		_ => return Script.fail!("Usage: blueprint run check [-- --static-only]")
+	}
+	Script.command("roc-policy").run!(["check", "--root", "."].map(OsStr.from_str))?
 	check_tooling!()?
 	check_platform!()?
+	if static_only {
+		check_worktree!()?
+		return Script.pass!("Source checks completed successfully")
+	}
 	run_script!("scripts/build_platform.roc", [])?
 	run_script!("scripts/examples.roc", ["--operation", "run"])?
 	check_bundle!()?
@@ -26,14 +37,31 @@ main! = |_args| {
 
 check_tooling! = || {
 	Script.info!("CHECK", "Formatting and type-checking repository tooling")?
+	source = Path.read_utf8!(Path.utf8("scripts/check_all.roc"))?
+	header = match RocSource.app_header(source)? {
+		[found] => found
+		_ => return Script.fail!("Missing check script app header")
+	}
+	pin = RocSource.value_for(source, header, "roc")?
+	Script.require!(Path.read_utf8!(Path.utf8("Blueprint.roc"))?.contains("nix#rocpkgs.${pin}"), "Blueprint roc-stable must match the tooling script compiler")?
+	tracked_bytes = Script.command("git").capture!(["ls-files", "-z"].map(OsStr.from_str), Path.utf8("."), [])?
+	for name in Str.from_utf8_lossy(tracked_bytes).split_on(Str.from_utf8_lossy([0])) {
+		Script.require!(!(name == ".roc-version" or name.ends_with("/.roc-version") or name == ".github/roc-nightly.json"), "Forbidden compiler pin file: ${name}")?
+	}
 	stable = Script.roc_stable!()?
 	script_files = Files.roc_files!(Path.utf8("scripts"))?
 	stable.run!(["fmt", "--check"].map(OsStr.from_str).concat(script_files.map(Path.to_os_str)))?
 	for path in Files.direct_files!(Path.utf8("scripts"))? {
 		if Path.ext(path).map_ok(Path.display) == Ok("roc") {
 			stable.run!([OsStr.from_str("check"), Path.to_os_str(path)])?
+			dependencies = stable.capture!([OsStr.from_str("deps"), Path.to_os_str(path)], Path.utf8("."), [])?
+			for url in dependency_urls(Str.from_utf8_lossy(dependencies)) {
+				Script.require!(Path.read_utf8!(Path.utf8("Blueprint.roc"))?.contains(Json.to_str(url)), "Undeclared script dependency: ${url}")?
+			}
 		}
 	}
+	stable.run!(["test", "scripts/tooling_tests.roc"].map(OsStr.from_str))?
+	stable.run!(["test", "scripts/check_all.roc"].map(OsStr.from_str))?
 	Ok({})
 }
 
@@ -42,6 +70,7 @@ check_platform! = || {
 	roc = Script.roc!()?
 	roc.run!(["fmt", "--check", "platform", "examples"].map(OsStr.from_str))?
 	roc.run!(["check", "platform/main.roc"].map(OsStr.from_str))?
+	roc.run!(["test", "platform/main.roc"].map(OsStr.from_str))?
 	for path in Files.roc_files!(Path.utf8("examples"))? {
 		if Path.read_utf8!(path)?.contains("\nexpect ") {
 			roc.run!([OsStr.from_str("test"), Path.to_os_str(path)])?
@@ -70,3 +99,8 @@ check_worktree! = || {
 }
 
 run_script! = |script, args| Script.roc_stable!()?.run!([script, "--"].concat(args).map(OsStr.from_str))
+
+dependency_urls = |tree| tree.split_on("\n").join_map(|line| line.split_on(" ").keep_if(|word| word.starts_with("https://")))
+
+expect dependency_urls("tree\n├── https://example.org/a.tar.zst [platform]\n│   └── https://example.org/b.tar.zst") == ["https://example.org/a.tar.zst", "https://example.org/b.tar.zst"]
+expect dependency_urls("no dependencies") == []

@@ -1,0 +1,5 @@
+= Release history
+
+include::releases/1.2.1.adoc[leveloffset=+1]
+
+include::releases/1.2.0.adoc[leveloffset=+1]

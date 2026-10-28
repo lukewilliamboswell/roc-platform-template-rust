@@ -1,18 +1,18 @@
 name: Release
 
-# A pull request runs the whole pipeline as a dry run under version 0.0.0-dryrun;
-# only a dispatch from main publishes.
+# Pull requests exercise the complete candidate path. Only an explicit dispatch
+# from main attests and publishes the exact files tested in this run.
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'New package version (e.g., 1.2.0; no v prefix)'
+        description: 'New package version (e.g., 1.2.1; no v prefix)'
         required: true
         type: string
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -26,6 +26,7 @@ jobs:
       version: ${{ steps.policy.outputs.version }}
       publish: ${{ steps.policy.outputs.publish }}
       nightly-tag: ${{ steps.nightly.outputs.tag }}
+      previous-bundle: ${{ steps.baseline.outputs.url }}
     steps:
       - id: policy
         env:
@@ -36,83 +37,144 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           if [ "$EVENT" != workflow_dispatch ]; then
-            printf 'version=0.0.0-dryrun\npublish=false\n' >> "$GITHUB_OUTPUT"
+            printf 'version=0.0.1-dryrun\npublish=false\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          test "$REF" = "refs/heads/$DEFAULT_BRANCH" || { echo "Releases publish from $DEFAULT_BRANCH only" >&2; exit 1; }
-          [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must be MAJOR.MINOR.PATCH" >&2; exit 1; }
-          # Fail closed on an existing tag or an API error; never replace a release.
+          test "$REF" = "refs/heads/$DEFAULT_BRANCH" || { echo 'Publish from the default branch only' >&2; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Version must be MAJOR.MINOR.PATCH' >&2; exit 1; }
           refs=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_TAG" --jq '.[].ref')
-          if printf '%s\n' "$refs" | grep -qx "refs/tags/$RELEASE_TAG"; then echo "Release tag already exists" >&2; exit 1; fi
+          if printf '%s\n' "$refs" | grep -qx "refs/tags/$RELEASE_TAG"; then echo 'Release tag already exists' >&2; exit 1; fi
+          # A draft can exist without a tag. Never adopt or overwrite one.
+          releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
+          if printf '%s\n' "$releases" | grep -qx "$RELEASE_TAG"; then echo 'Release already exists, including drafts' >&2; exit 1; fi
           printf 'version=%s\npublish=true\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
       - id: nightly
         env:
           GH_TOKEN: ${{ github.token }}
         run: echo "tag=$(gh api repos/roc-lang/nightlies/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
 
+      - id: baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.policy.outputs.version }}
+          PUBLISH: ${{ steps.policy.outputs.publish }}
+        run: |
+          releases=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100")
+          previous=$(printf '%s' "$releases" | jq -c '[.[][] | select(.draft == false and .prerelease == false and (.tag_name | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")))] | sort_by(.published_at) | last // null')
+          if [ "$previous" = null ]; then
+            if [ "$PUBLISH" = true ] && [ "$VERSION" != 1.0.0 ]; then
+              echo 'The first product release must be 1.0.0' >&2
+              exit 1
+            fi
+            echo 'url=' >> "$GITHUB_OUTPUT"
+          else
+            baseline=$(printf '%s' "$previous" | jq -er '[.assets[] | select(.name | endswith(".tar.zst"))] | if length == 1 then .[0].browser_download_url else error("Latest final product release must have exactly one bundle") end')
+            echo "url=$baseline" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build and Bundle Platform
     needs: validate
-    runs-on: macos-15  # macOS can cross-compile to all targets
+    runs-on: macos-15
     permissions:
       contents: read
     outputs:
-      bundle_filename: ${{ steps.bundle.outputs.bundle_filename }}
-      examples_filename: ${{ steps.examples.outputs.examples_filename }}
+      bundle_filename: ${{ steps.bundle.outputs.filename }}
+      assets: ${{ steps.candidate.outputs.assets }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
+          ref: ${{ github.sha }}
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
         with:
           install-nix: 'true'
-
-      - name: Install Roc nightly
-        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
-
-      - name: Install Rust with cross-compilation targets
-        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - name: Check source and generated bindings at the exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ needs.validate.outputs.nightly-tag }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          blueprint run check-source
+          blueprint run test-driver
+          blueprint run bindings -- --nightly-tag "$NIGHTLY_TAG"
+      - name: Fingerprint native inputs, selected toolchain and SDK
+        id: host-key
+        run: |
+          blueprint run host-fingerprint
+          echo "key=$(cat .blueprint/host-fingerprint)" >> "$GITHUB_OUTPUT"
+      - name: Restore only exactly matching native hosts
+        id: host
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
-          targets: x86_64-apple-darwin,aarch64-apple-darwin,x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
-
-      - name: Build platform for all targets
+          path: |
+            platform/targets/*/libhost.a
+            platform/targets/*/libhost.a.sha256
+          key: host-${{ runner.os }}-${{ steps.host-key.outputs.key }}
+      - name: Restore content-addressed linker inputs
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.cache/roc-platform-template-rust/link-inputs
+          key: linker-inputs-${{ hashFiles('runtime/link-inputs.lock.json') }}
+      - name: Build every native target once
+        if: steps.host.outputs.cache-hit != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: blueprint run build-platform -- --target all
-
-      - name: Bundle platform
+      - name: Verify locked inputs alongside restored hosts
+        if: steps.host.outputs.cache-hit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: blueprint run build-platform -- --target all --skip-host
+      - name: Bundle the exact platform
         id: bundle
         run: |
           blueprint run bundle -- --target all --output-dir dist
           bundles=(dist/*.tar.zst)
           test "${#bundles[@]}" = 1
-          echo "bundle_filename=$(basename "${bundles[0]}")" >> "$GITHUB_OUTPUT"
-
-      - name: Package examples archive
-        id: examples
+          echo "filename=$(basename "${bundles[0]}")" >> "$GITHUB_OUTPUT"
+      - name: Build the manual
         env:
-          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          BUNDLE_FILENAME: ${{ steps.bundle.outputs.bundle_filename }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: blueprint run docs -- --docs-version "$VERSION"
+      - name: Package examples, API archive and authored release notes
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          BUNDLE: ${{ steps.bundle.outputs.filename }}
+          PREVIOUS_BUNDLE: ${{ needs.validate.outputs.previous-bundle }}
+        run: blueprint run release-assets -- --release-version "$VERSION" --previous-bundle "$PREVIOUS_BUNDLE" --bundle "$BUNDLE" --output-dir dist
+      - name: Bind and locally validate every product SBOM
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          BUNDLE: ${{ steps.bundle.outputs.filename }}
+        run: blueprint run prepare-sbom -- --release-version "$VERSION" --bundle "$BUNDLE" --output-dir dist
+      - name: Exercise evidence binding, graph queries and tampering refusals
+        run: blueprint run release-evidence-test -- dist
+      - name: Freeze the explicit publication asset set
+        id: candidate
         run: |
-          EXAMPLES_FILENAME="roc-platform-template-rust-examples-$RELEASE_VERSION.zip"
-          blueprint run examples -- --operation package --release-version "$RELEASE_VERSION" \
-            --platform-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_VERSION/$BUNDLE_FILENAME" \
-            --output "dist/$EXAMPLES_FILENAME"
-          echo "examples_filename=$EXAMPLES_FILENAME" >> "$GITHUB_OUTPUT"
-
-      - name: Upload release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          while IFS= read -r asset; do sha256sum "$asset" | sed 's@  dist/@  @'; done < dist/release-assets.txt > dist/SHA256SUMS
+          printf '%s\n' dist/SHA256SUMS dist/release-notes.md >> dist/release-assets.txt
+          {
+            echo 'assets<<RELEASE_ASSETS'
+            cat dist/release-assets.txt
+            echo 'RELEASE_ASSETS'
+          } >> "$GITHUB_OUTPUT"
+      - name: Preserve the exact candidate files
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-assets
-          path: dist/
+          path: ${{ steps.candidate.outputs.assets }}
+          if-no-files-found: error
           retention-days: 30
 
-  # Each target runs the exact archive against the exact bundle with an empty
-  # package cache; only the bundle download location changes.
   test:
     name: Test Bundle (${{ matrix.os }})
     needs: [validate, build]
@@ -122,98 +184,115 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - macos-15          # Apple Silicon
-          - ubuntu-22.04      # Linux x86_64
-          - ubuntu-24.04-arm  # Linux ARM64
+        os: [macos-15, ubuntu-22.04, ubuntu-24.04-arm]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
+          ref: ${{ github.sha }}
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
         with:
           install-nix: 'true'
-
-      - name: Install Roc nightly
-        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
         with:
           version: nightly-new-compiler
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: release-assets
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
-
-      - name: Run the archived examples against the bundle
+      - name: Test the exact archived examples against the exact bundle
         env:
-          BUNDLE_FILENAME: ${{ needs.build.outputs.bundle_filename }}
-          EXAMPLES_FILENAME: ${{ needs.build.outputs.examples_filename }}
-        run: blueprint run examples -- --operation test --archive "dist/$EXAMPLES_FILENAME" --bundle "dist/$BUNDLE_FILENAME"
+          VERSION: ${{ needs.validate.outputs.version }}
+          BUNDLE: ${{ needs.build.outputs.bundle_filename }}
+        run: blueprint run examples -- --operation test --archive "dist/roc-platform-template-rust-examples-$VERSION.zip" --bundle "dist/$BUNDLE"
 
-  docs:
-    name: Build Platform Docs
-    needs: validate
+  runtime-tests:
+    name: Runtime tooling regressions
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Install Roc nightly
-        uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+          ref: ${{ github.sha }}
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
         with:
-          version: nightly-new-compiler
-          nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
+          install-nix: 'true'
+      - run: blueprint run runtime-cli-tests
 
-      - name: Generate docs
-        run: |
-          roc docs platform/main.roc --output=generated-docs --no-cache
-          touch generated-docs/.nojekyll
-
-      - name: Upload docs artifact
-        if: needs.validate.outputs.publish == 'true'
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: generated-docs
-
-  publish:
-    name: Create GitHub Release
-    needs: [validate, build, test, docs]
+  attest:
+    name: Attest the tested files
+    needs: [validate, build, test, runtime-tests]
     if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      # No checkout, candidate executable, Blueprint task or repository script.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: dist
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ needs.build.outputs.assets }}
+          show-summary: true
+
+  publish:
+    name: Create GitHub Release
+    needs: [validate, build, test, runtime-tests, attest]
+    if: needs.validate.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      # The shared publisher handles these inert files with its own reviewed
+      # tooling: stage draft, upload, download/hash-verify, then publish once.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: release-assets
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
+      - uses: lukewilliamboswell/roc-automation/actions/publish-release@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          version: ${{ needs.validate.outputs.version }}
+          prerelease: 'false'
+          target: ${{ github.sha }}
+          notes-file: dist/release-notes.md
+          assets: ${{ needs.build.outputs.assets }}
 
-      - name: Create GitHub Release
+  site:
+    name: Build the published documentation site
+    needs: [validate, publish]
+    if: needs.validate.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+        with:
+          install-nix: 'true'
+      - name: Render the manual and assemble the newly published API archive
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          ROC_COMPILER: ${{ needs.validate.outputs.nightly-tag }}
-          BUNDLE_FILENAME: ${{ needs.build.outputs.bundle_filename }}
-          EXAMPLES_FILENAME: ${{ needs.build.outputs.examples_filename }}
-        working-directory: dist
         run: |
-          test -f "$BUNDLE_FILENAME"
-          test -f "$EXAMPLES_FILENAME"
-          sha256sum "$BUNDLE_FILENAME" "$EXAMPLES_FILENAME" > SHA256SUMS
-          printf 'Tested with compiler: `%s`\n\nTested source: `%s`\n\nPlatform: https://github.com/%s/releases/download/%s/%s\n' \
-            "$ROC_COMPILER" "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$RELEASE_VERSION" "$BUNDLE_FILENAME" > ../release-notes.md
-          gh release create "$RELEASE_VERSION" "$BUNDLE_FILENAME" "$EXAMPLES_FILENAME" SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$RELEASE_VERSION" \
-            --generate-notes --notes-file ../release-notes.md
+          blueprint run docs
+          blueprint run docs-site
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+        with:
+          path: .docs-out/site
 
   deploy-docs:
     name: Deploy Docs to GitHub Pages
-    needs: [validate, docs, publish]
+    needs: [validate, site]
     if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -223,14 +302,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy docs
-        id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
 
   required:
     name: Release required
     if: always()
-    needs: [validate, build, test, docs]
+    needs: [validate, build, test, runtime-tests]
     runs-on: ubuntu-24.04
     permissions: {}
     steps:

@@ -1,5 +1,77 @@
 (
-	(fetched ())
+	(fetched ((
+		(name "roc-policy")
+		(obtained Both)
+		(served ("release-assets.githubusercontent.com"))
+		(sha256 "5818173cdd474161af59fa8178dfd97d80d0dd97744504ba03f4dd37d47f413d")
+		(size 6462648)
+		(system "x86_64-linux")
+		(urls ("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-policy-x86_64-linux"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-automation/releases/tags/tools-0.6.0")) (
+		(name "roc-policy")
+		(obtained Published)
+		(served ())
+		(sha256 "072cefb17beb4be11d7a95f7c09ced734388934592ba5af11822885e5ea2b0e5")
+		(size 5072568)
+		(system "aarch64-linux")
+		(urls ("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-policy-aarch64-linux"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-automation/releases/tags/tools-0.6.0")) (
+		(name "roc-policy")
+		(obtained Published)
+		(served ())
+		(sha256 "ec10d4f15e808d24aa888f197b096882d2064d629d5de2873c51cf0c2aff5cf5")
+		(size 4890656)
+		(system "aarch64-darwin")
+		(urls ("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-policy-aarch64-darwin"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-automation/releases/tags/tools-0.6.0")) (
+		(name "blueprint-sbom")
+		(obtained Both)
+		(served ("release-assets.githubusercontent.com"))
+		(sha256 "f6d1ec0b9f00cb8aae60bb62d9cc0598fe0325c38e7aa84d55cf2dbab6831c20")
+		(size 7336344)
+		(system "x86_64-linux")
+		(urls ("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.8.0/blueprint-sbom-x86_64-linux"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-blueprint/releases/tags/0.8.0")) (
+		(name "blueprint-sbom")
+		(obtained Published)
+		(served ())
+		(sha256 "e83e9fe84effc11cbee925ee0c04d873ee7506bcbd57f37049a5e71cfe14ffb4")
+		(size 5640320)
+		(system "aarch64-linux")
+		(urls ("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.8.0/blueprint-sbom-aarch64-linux"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-blueprint/releases/tags/0.8.0")) (
+		(name "blueprint-sbom")
+		(obtained Published)
+		(served ())
+		(sha256 "7df3245c564ed8f87e9f411e9035ec4eaf5470f91bb214aa7bb599fb9beb81be")
+		(size 5693264)
+		(system "aarch64-darwin")
+		(urls ("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.8.0/blueprint-sbom-aarch64-darwin"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-blueprint/releases/tags/0.8.0")) (
+		(name "roc-docs")
+		(obtained Both)
+		(served ("release-assets.githubusercontent.com"))
+		(sha256 "3e5ef524aa17eeb81538c639ad4959bf4690b178898930ea0a42a2cd8bf7312d")
+		(size 22216616)
+		(system "x86_64-linux")
+		(urls ("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-docs-x86_64-linux"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-automation/releases/tags/tools-0.6.0")) (
+		(name "roc-docs")
+		(obtained Published)
+		(served ())
+		(sha256 "a8f82f1565d8bae97b956df5d1903da8e62114af57eb8b40eb1aad084518b5f7")
+		(size 17440136)
+		(system "aarch64-linux")
+		(urls ("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-docs-aarch64-linux"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-automation/releases/tags/tools-0.6.0")) (
+		(name "roc-docs")
+		(obtained Published)
+		(served ())
+		(sha256 "181817a0673f5036b75d3d29707ef665b45ea7f3ccfe9bbc35362a72639b40fc")
+		(size 17396432)
+		(system "aarch64-darwin")
+		(urls ("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-docs-aarch64-darwin"))
+		(witness "https://api.github.com/repos/lukewilliamboswell/roc-automation/releases/tags/tools-0.6.0"))))
 	(format (
 		(major 2)
 		(minor 0)))
@@ -26,6 +98,14 @@
 						(value (Str "overlay"))) (
 						(name "flake")
 						(value (Bool true))))))) (
+					(name "rust")
+					(value (Attrs ((
+						(name "ref")
+						(value (Str "github:oxalica/rust-overlay"))) (
+						(name "kind")
+						(value (Str "overlay"))) (
+						(name "flake")
+						(value (Bool true))))))) (
 					(name "zig")
 					(value (Attrs ((
 						(name "ref")
@@ -37,7 +117,7 @@
 				(name "overlays")
 				(value (Attrs ((
 					(name "dev")
-					(value (List ((Str "roc") (Str "zig"))))))))))))) (
+					(value (List ((Str "roc") (Str "zig") (Str "rust"))))))))))))) (
 			(name "graph")
 			(value (Attrs ((
 				(name "root")
@@ -155,6 +235,32 @@
 						(name "locked")
 						(value (Attrs ((
 							(name "lastModified")
+							(value (Int 1744536153))) (
+							(name "narHash")
+							(value (Str "sha256-awS2zRgF4uTwrOKwwiJcByDzDOdo3Q1rPZbiHQg/N38="))) (
+							(name "owner")
+							(value (Str "NixOS"))) (
+							(name "repo")
+							(value (Str "nixpkgs"))) (
+							(name "rev")
+							(value (Str "18dd725c29603f582cf1900e0d25f9f1063dbf11"))) (
+							(name "type")
+							(value (Str "github"))))))) (
+						(name "original")
+						(value (Attrs ((
+							(name "owner")
+							(value (Str "NixOS"))) (
+							(name "ref")
+							(value (Str "nixpkgs-unstable"))) (
+							(name "repo")
+							(value (Str "nixpkgs"))) (
+							(name "type")
+							(value (Str "github"))))))))))) (
+					(name "nixpkgs_3")
+					(value (Attrs ((
+						(name "locked")
+						(value (Attrs ((
+							(name "lastModified")
 							(value (Int 1771043024))) (
 							(name "narHash")
 							(value (Str "sha256-O1XDr7EWbRp+kHrNNgLWgIrB0/US5wvw9K6RERWAj6I="))) (
@@ -187,15 +293,15 @@
 						(name "locked")
 						(value (Attrs ((
 							(name "lastModified")
-							(value (Int 1793021098))) (
+							(value (Int 1793199093))) (
 							(name "narHash")
-							(value (Str "sha256-KQ+hq0UmV26UxWCFJz3+BONCpB5Vywz4P1Iy6zq+8qw="))) (
+							(value (Str "sha256-xlHjE7fcI/OWKbwOOOMDseo+Q/HuY7+Z/lNAp5fkUaA="))) (
 							(name "owner")
 							(value (Str "roc-lang"))) (
 							(name "repo")
 							(value (Str "roc-overlay"))) (
 							(name "rev")
-							(value (Str "f577551f0965abc7c3b14f08e34925e5f2b629ba"))) (
+							(value (Str "2e1fb05be4dd29e1cf68470164e49a3b153b0bbf"))) (
 							(name "type")
 							(value (Str "github"))))))) (
 						(name "original")
@@ -216,8 +322,38 @@
 							(value (List ((Str "nix"))))) (
 							(name "roc")
 							(value (Str "roc"))) (
+							(name "rust")
+							(value (Str "rust"))) (
 							(name "zig")
 							(value (Str "zig"))))))))))) (
+					(name "rust")
+					(value (Attrs ((
+						(name "inputs")
+						(value (Attrs ((
+							(name "nixpkgs")
+							(value (Str "nixpkgs_2"))))))) (
+						(name "locked")
+						(value (Attrs ((
+							(name "lastModified")
+							(value (Int 1793174968))) (
+							(name "narHash")
+							(value (Str "sha256-u5nUf4cewaT36iIzG1s/VECktqUMiZaGF5BsgervsvQ="))) (
+							(name "owner")
+							(value (Str "oxalica"))) (
+							(name "repo")
+							(value (Str "rust-overlay"))) (
+							(name "rev")
+							(value (Str "19ecdd08213836b36c4296a3a4f4af5a3d5308db"))) (
+							(name "type")
+							(value (Str "github"))))))) (
+						(name "original")
+						(value (Attrs ((
+							(name "owner")
+							(value (Str "oxalica"))) (
+							(name "repo")
+							(value (Str "rust-overlay"))) (
+							(name "type")
+							(value (Str "github"))))))))))) (
 					(name "systems")
 					(value (Attrs ((
 						(name "flake")
@@ -251,7 +387,7 @@
 							(name "flake-compat")
 							(value (Str "flake-compat"))) (
 							(name "nixpkgs")
-							(value (Str "nixpkgs_2"))) (
+							(value (Str "nixpkgs_3"))) (
 							(name "systems")
 							(value (Str "systems"))))))) (
 						(name "locked")
@@ -281,13 +417,15 @@
 		(inputs ((
 			(name "roc")
 			(url "github:roc-lang/roc-overlay")) (
+			(name "rust")
+			(url "github:oxalica/rust-overlay")) (
 			(name "zig")
 			(url "github:mitchellh/zig-overlay"))))
 		(overlays ((
 			(environment "dev")
-			(overlays ("roc" "zig")))))
+			(overlays ("roc" "zig" "rust")))))
 		(resolvers ((
-			(inputs ("roc" "zig"))
+			(inputs ("roc" "rust" "zig"))
 			(provider "nix"))))
 		(sources ((
 			(name "nix")
@@ -301,11 +439,16 @@
 		(provider "nix")
 		(ref "github:NixOS/nixpkgs/nixos-unstable")
 		(rev "31ecbaca1bdefa45dffc409f0250bd8039ea0010")) (
-		(digest "sha256:290fa1ab4526576e94c56085273dfe04e342a41e55cb0cf83f5232eb3abef2ac")
+		(digest "sha256:c651e313b7dc23f39629bc0e38e303b1ea3e43f1ee63bf99fe5340a797e451a0")
 		(name "roc")
 		(provider "nix")
 		(ref "github:roc-lang/roc-overlay")
-		(rev "f577551f0965abc7c3b14f08e34925e5f2b629ba")) (
+		(rev "2e1fb05be4dd29e1cf68470164e49a3b153b0bbf")) (
+		(digest "sha256:bb99d47f871ec1a4f7ea22331b5b3f5440a4b6a50c89968617906c81eaefb2f4")
+		(name "rust")
+		(provider "nix")
+		(ref "github:oxalica/rust-overlay")
+		(rev "19ecdd08213836b36c4296a3a4f4af5a3d5308db")) (
 		(digest "sha256:1993241d9c7bb564f3b49f980ac170db3524cd6eb3bee0c68310ffe21d3087a2")
 		(name "zig")
 		(provider "nix")

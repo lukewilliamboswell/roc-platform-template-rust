@@ -45,3 +45,9 @@ dist/
 platform/runtime/
 .examples-build/
 .blueprint/
+
+.docs-out/
+
+platform/targets/*/libhost.a.sha256
+
+.runtime-build-work/
