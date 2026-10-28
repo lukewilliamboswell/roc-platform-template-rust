@@ -43,7 +43,9 @@ RuntimeProducer := [].{
 		sha = Env.var_str!("RUNTIME_SOURCE_SHA").ok_or(Env.var_str!("GITHUB_SHA").ok_or(""))
 		ref = Env.var_str!("RUNTIME_SOURCE_REF").ok_or(Env.var_str!("GITHUB_REF").ok_or(""))
 		Runtime.require!(Runtime.hex(sha, 40) and ref.starts_with("refs/heads/"), "Release preparation requires an exact GitHub branch commit")?
-		manifest = { schema_version: 1, kind: "link-inputs", source: { repository: Runtime.repository, sha, ref, workflow: "${Runtime.repository}/${Runtime.workflow}", input_fingerprint: Runtime.fingerprint!()? }, asset_records: assets }
+		schema_version : U64
+		schema_version = 1
+		manifest = { schema_version, kind: "link-inputs", source: { repository: Runtime.repository, sha, ref, workflow: "${Runtime.repository}/${Runtime.workflow}", input_fingerprint: Runtime.fingerprint!()? }, asset_records: assets }
 		# jq supplies canonical sorted object keys and converts the target-indexed
 		# asset list without relying on a compiler-specific dictionary encoding.
 		canonical = checked!(["jq", "-cS", ".assets = (.asset_records | map({key: .target, value: {asset, sha256, size}}) | from_entries) | del(.asset_records)"], Json.to_str(manifest).to_utf8())?
@@ -145,7 +147,9 @@ build_inner! = |work, output| {
 	for name in names {
 		$files = $files.append({ name, sha256: Runtime.sha!(Path.join(stage, name))? })
 	}
-	manifest_value = { schema_version: 1, source, target_records: { x64musl: "x86_64-linux-musl", arm64musl: "aarch64-linux-musl" }, file_records: $files }
+	schema_version : U64
+	schema_version = 1
+	manifest_value = { schema_version, source, target_records: { x64musl: "x86_64-linux-musl", arm64musl: "aarch64-linux-musl" }, file_records: $files }
 	manifest = checked!(["jq", "-S", ".targets = .target_records | .files = (.file_records | map({key: .name, value: .sha256}) | from_entries) | del(.target_records,.file_records)"], Json.to_str(manifest_value).to_utf8())?
 	Path.write_bytes!(Path.join(stage, "manifest.json"), manifest)?
 	temporary_tar = Path.join(work, "runtime.tar")
