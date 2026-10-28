@@ -49,3 +49,5 @@ platform/runtime/
 .docs-out/
 
 platform/targets/*/libhost.a.sha256
+
+.runtime-build-work/
