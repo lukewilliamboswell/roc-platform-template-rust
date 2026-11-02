@@ -26,12 +26,10 @@ builder's architecture.
 or removing a tool, task or locked program requires reviewing this file;
 `blueprint-sbom inspect` fails on missing or stale dispositions.
 
-## Shared-tooling follow-ups
+## Coverage and corrections
 
-- **TODO [roc-automation #62](https://github.com/lukewilliamboswell/roc-automation/issues/62):** the current linker-input publisher rejects external sidecars and evidence. Its schema-2 extension adds component build records, not SBOM files. The selected immutable linker-input release has no supplier sidecars. Preserve that release and its digest, report its missing supplier evidence as incomplete, and adopt the versioned publisher extension once available. Never disguise a sidecar as a target `.tar` asset or mutate an existing release.
-- **TODO [roc-automation #62](https://github.com/lukewilliamboswell/roc-automation/issues/62):** the current released SBOM utility performs local generation and consistency checks. An independently maintained admission validator and authenticated supplier-SBOM handoff remain upstream work; successful local checks do not claim those controls exist.
-- **TODO [roc-automation #83](https://github.com/lukewilliamboswell/roc-automation/issues/83):** replace this platform-specific release adapter with the shared platform lifecycle when its released interface supports these deliverables and target matrix.
-
-Release notes expose these gaps. Corrections to a published inventory require a
-new immutable document revision/location; changed software bytes require a new
-software version. Release 1.2.0 and existing linker-input releases are unchanged.
+Local generation and consistency checks do not authenticate supplier provenance
+or establish complete dependency coverage. Missing supplier SBOMs remain explicit
+findings in the released inventories; never disguise sidecars as target archives.
+Corrections to a published inventory need a new immutable document revision bound
+to the software digest. Changed software bytes need a new software version.

@@ -13,6 +13,16 @@ Open a pull request from current main. Keep commits focused and signed. Run
 `blueprint run check` before review; CI also tests the exact release candidate
 archives. Changes to behavior need meaningful tests, including error cases.
 
+== Documentation
+
+Every paragraph should help someone use, maintain or assess the current project.
+Delete superseded instructions and duplicate explanations. Keep implementation
+history in Git, unresolved work in issues, and release-specific changes on the
+published release; do not include release notes in the manual. Preserve current
+compatibility guidance, security boundaries, API contracts and required notices.
+
+Use the https://lukewilliamboswell.github.io/roc-automation/documentation.html#write-project-documentation[shared documentation guide] for structure and publishing.
+
 == Tooling and product compilers
 
 Blueprint declares the tools and native toolchains; its lock records the

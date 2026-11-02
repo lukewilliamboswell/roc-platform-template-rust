@@ -85,10 +85,7 @@ release boundary.
 
 == Component inventories
 
-The selected historical linker-input releases have no artifact-bound supplier
-SBOM sidecars. Do not substitute an unpublished inventory or claim complete
-supplier coverage. Product inventories record this as an explicit gap.
-The trusted publisher currently rejects extra sidecars; its versioned manifest,
-attestation, transfer verification and generated lock need shared support before
-this step can be enabled. The upstream TODO is linked from
-https://github.com/lukewilliamboswell/roc-automation/issues/62[roc-automation#62].
+Supplier SBOM coverage is reported in the product inventories. Missing supplier
+documents remain explicit gaps; do not substitute unpublished inventories or
+claim complete coverage. See the repository's `sbom/README.md` for composition
+inputs and verification limits.
