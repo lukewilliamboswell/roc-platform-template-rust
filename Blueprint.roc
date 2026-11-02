@@ -24,7 +24,7 @@ config = [
 		[
 			Overlays(["roc", "zig", "rust"]),
 			Programs([
-				Fetch("roc-policy", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-policy-{system}")),
+				Fetch("roc-policy", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.9.0/roc-policy-{system}")),
 				Fetch("blueprint-sbom", Recipes.file("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.8.0/blueprint-sbom-{system}")),
 			]),
 			Command("roc-stable", "nix#rocpkgs.nightly-2026-10-25-72704da"),
@@ -41,7 +41,7 @@ config = [
 			Tools(["nix#python3", "nix#curl", "nix#gnutar", "nix#xz", "nix#gzip", "nix#jq", "nix#zstd", "nix#coreutils", "nix#gh", "nix#git", "nix#unzip", "nix#zip", "nix#zigpkgs.\"0.16.0\""]),
 		],
 	),
-	Environment("docs", [Programs([Fetch("roc-docs", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.6.0/roc-docs-{system}"))])]),
+	Environment("docs", [Programs([Fetch("roc-docs", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.9.0/roc-docs-{system}"))])]),
 	Task("docs", [Use("docs"), Run(["roc-docs", "build", "--workspace", ".", "--output-directory", ".docs-out/manual", "--pdf-filename", "roc-platform-template-rust.pdf", "--site-url", "https://lukewilliamboswell.github.io/roc-platform-template-rust/manual/"])]),
 	Task("docs-path", [Use("docs"), Run(["sh", "-c", "realpath \"$(command -v roc-docs)\""])]),
 	Task("docs-site", [Use("dev"), Run(["scripts/docs_site.roc", "--"])]),
