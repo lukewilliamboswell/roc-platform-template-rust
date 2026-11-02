@@ -1,5 +1,5 @@
-= Release history
+= Release downloads
 
-include::releases/1.2.1.adoc[leveloffset=+1]
-
-include::releases/1.2.0.adoc[leveloffset=+1]
+Download platform bundles, examples, documentation and release notes from
+https://github.com/lukewilliamboswell/roc-platform-template-rust/releases[GitHub Releases].
+Use the latest final release for new applications.
