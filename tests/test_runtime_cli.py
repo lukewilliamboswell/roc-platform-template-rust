@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = os.environ.get('ROC_RUNTIME_BINARY')
-LIBRARIES = ('crt1.o', 'libc.a', 'libunwind.a', 'libzigc.a', 'libcompiler_rt.a')
+LIBRARIES = ('rcrt1.o', 'libc.a', 'libunwind.a', 'libzigc.a', 'libcompiler_rt.a')
 LICENSES = ('licenses/musl.txt', 'licenses/libunwind.txt', 'licenses/zig.txt')
 
 
@@ -66,6 +66,15 @@ class RuntimeArchiveTests(unittest.TestCase):
 
     def test_combined_archive_passes(self):
         self.verdict(passes=True, combined=True)
+
+    def test_fixed_address_startup_rejected_even_when_manifest_agrees(self):
+        def substitute_crt(manifest, members):
+            for index, (name, data, kind) in enumerate(members):
+                if name.endswith('/rcrt1.o'):
+                    old = name.replace('/rcrt1.o', '/crt1.o')
+                    members[index] = (old, data, kind)
+                    manifest['files'][old] = manifest['files'].pop(name)
+        self.verdict(substitute_crt, combined=True)
 
     def test_duplicate_member_fails(self):
         self.verdict(lambda manifest, members: members.append(members[0]))

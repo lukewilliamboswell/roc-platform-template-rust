@@ -9,7 +9,7 @@ Runtime := [].{
 	repository = "lukewilliamboswell/roc-platform-template-rust"
 	workflow = ".github/workflows/runtime-release.yml"
 	target_names = ["x64musl", "arm64musl"]
-	libraries = ["crt1.o", "libc.a", "libunwind.a", "libzigc.a", "libcompiler_rt.a"]
+	libraries = ["rcrt1.o", "libc.a", "libunwind.a", "libzigc.a", "libcompiler_rt.a"]
 	license_files = ["licenses/musl.txt", "licenses/libunwind.txt", "licenses/zig.txt"]
 	producer_inputs = ["scripts/runtime_build.roc", "scripts/runtime.roc", "scripts/runtime_test.roc", "scripts/src/Runtime.roc", "scripts/src/RuntimeProducer.roc", "runtime/source.json", "runtime/smoke.c", "runtime/test-toolchains.json", ".github/workflows/runtime-release.yml", "Blueprint.roc", "Blueprint.lock"]
 

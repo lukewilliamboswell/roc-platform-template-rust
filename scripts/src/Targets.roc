@@ -17,11 +17,11 @@ Targets := [].{
 
 	## Prebuilt files under platform/targets/<target>/ that a bundle ships.
 	files = |target|
-		if (target.ends_with("musl")) ["crt1.o", "libhost.a", "libunwind.a", "libc.a", "libzigc.a", "libcompiler_rt.a"] else ["libhost.a"]
+		if (target.ends_with("musl")) ["rcrt1.o", "libhost.a", "libunwind.a", "libc.a", "libzigc.a", "libcompiler_rt.a"] else ["libhost.a"]
 
 	## The `inputs` list for the target in the platform header.
 	inputs = |target|
-		if (target.ends_with("musl")) "[\"crt1.o\", \"libhost.a\", \"libunwind.a\", app, \"libc.a\", \"libzigc.a\", \"libcompiler_rt.a\"]" else "[\"libhost.a\", app]"
+		if (target.ends_with("musl")) "[\"rcrt1.o\", \"libhost.a\", \"libunwind.a\", app, \"libc.a\", \"libzigc.a\", \"libcompiler_rt.a\"]" else "[\"libhost.a\", app]"
 
 	native! = || {
 		os = uname!("-s")?

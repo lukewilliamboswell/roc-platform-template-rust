@@ -4,7 +4,7 @@ import datetime
 ARTIFACT = "linux-runtime.tar.gz"
 REPOSITORY = "lukewilliamboswell/roc-platform-template-rust"
 RUNTIME_FILES = {f"targets/{target}/{name}" for target in ("x64musl", "arm64musl")
-                 for name in ("crt1.o", "libc.a", "libunwind.a", "libzigc.a", "libcompiler_rt.a")}
+                 for name in ("rcrt1.o", "libc.a", "libunwind.a", "libzigc.a", "libcompiler_rt.a")}
 
 def sbom_document(manifest, archive_sha, created=None):
     """An explicit SPDX inventory; no guessed upstream versions from stripped archives."""

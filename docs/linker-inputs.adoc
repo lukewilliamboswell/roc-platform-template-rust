@@ -17,9 +17,14 @@ The lock authorizes bytes; the cache merely avoids network traffic.
 
 `source.json` pins the Zig 0.16.0 distribution and source archive by SHA-256. The
 producer builds `x64musl` and `arm64musl` in separate empty caches and selects the
-five files from Zig's final link command: `crt1.o`, `libc.a`, `libunwind.a`,
+five inputs selected by `zig cc -static -fPIE`: `rcrt1.o`, `libc.a`, `libunwind.a`,
 `libzigc.a`, and `libcompiler_rt.a`. Each target archive also contains licenses
 and an inner manifest with per-file hashes.
+
+Roc's Linux dev linker produces a static position-independent executable. Its
+musl startup object must relocate the image before calling into libc. Replacing
+only the startup object is insufficient: the runtime archives must also come
+from the same PIE link, not from a fixed-address static build.
 
 The producer fingerprint covers the builder, native validator, source and test
 toolchain pins, smoke source, and workflow. This makes a material producer change
@@ -36,8 +41,10 @@ repository or release write authority.
 
 Use this order when the producer fingerprint changes:
 
-1. Stage the material change in a same-repository PR. Ordinary validation may
-   report a stale lock until the new release is adopted.
+1. Stage the material change in a same-repository PR. For a fork contribution,
+   a maintainer must first bring the reviewed source onto an upstream topic
+   branch. Ordinary validation reports a stale lock until the new release is
+   adopted.
 2. Optionally dispatch `runtime-release.yml` on the PR branch with
    `release_candidate=true` and `expected_sha` set to its exact head. Review the
    native tests, manifest, archive hashes, and attestations. This unprivileged
