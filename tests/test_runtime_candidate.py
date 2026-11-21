@@ -36,7 +36,7 @@ with open(os.environ['FAKE_ZIG_LOG'], 'a') as log:
 output = pathlib.Path(args[args.index('-o')+1])
 if '-c' in args:
     output.write_bytes(b'compiled-object'); sys.exit(0)
-for name in ('crt1.o','libunwind.a','libc.a','libzigc.a','libcompiler_rt.a'):
+for name in ('rcrt1.o','libunwind.a','libc.a','libzigc.a','libcompiler_rt.a'):
     paths = [pathlib.Path(arg) for arg in args if arg.endswith('/'+name)]
     assert len(paths) == 1 and paths[0].read_bytes() == name.encode(), name
 assert '-nostdlib' in args
@@ -102,6 +102,9 @@ output.chmod(0o755)
             self.assertFalse((root / 'fallback-ran').exists())
             commands = [json.loads(line) for line in (root / 'zig.log').read_text().splitlines()]
             self.assertEqual(len(commands), 2)
+            self.assertIn('-fPIE', commands[0])
+            self.assertIn('-static', commands[1])
+            self.assertIn('-fPIE', commands[1])
             self.assertIn('-nostdlib', commands[1])
             self.assertNotIn(str(root / 'smoke-x64musl'), commands[1])
 

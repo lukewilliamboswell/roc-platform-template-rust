@@ -1,0 +1,13 @@
+= 1.3.0
+
+Linux x86_64 and ARM64 bundles now include musl linker inputs built for static
+PIE, as required by Roc nightly `nightly-2026-11-20-3b29392`. The Rust host
+bindings are regenerated for that compiler. The ARM64 host uses Roc's
+cache-flush implementation. The release examples are tested natively on both
+Linux architectures and on Apple Silicon and Intel macOS.
+
+Applications using a previous release should update their platform URL to
+`{platform-url}`. The examples archive already uses the new URL.
+
+This release includes the tested examples, API documentation, the manual PDF,
+checksums, and software bills of materials for the release artifacts.

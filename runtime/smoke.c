@@ -6,6 +6,10 @@ static _Unwind_Reason_Code visit(struct _Unwind_Context *context, void *arg) {
     (*(int *)arg)++;
     return _URC_NO_REASON;
 }
+
+// Loading an initialized pointer exercises startup relocation before main.
+static const char *volatile message = "runtime OK";
+
 int main(void) {
     int frames = 0;
     volatile char *memory = malloc(64);
@@ -14,6 +18,6 @@ int main(void) {
     int value = memory[0];
     free((void *)memory);
     _Unwind_Backtrace(visit, &frames);
-    puts("runtime OK");
+    if (puts(message) < 0) return 3;
     return frames > 0 && value == 42 ? 0 : 2;
 }

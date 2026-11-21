@@ -143,7 +143,7 @@ package! = |version, platform_url, output| {
 			}
 			Path.write_utf8!(Path.join(root, "spec.json"), Json.to_str({ schema_version: spec.schema_version, release: version, dependencies: [platform_url], apps: spec.apps }))?
 			Path.write_utf8!(Path.join(root, "README.md"), readme(version, platform_url))?
-			Script.command("zip").base.args(["-X", "-q", "-r", Path.display(output_absolute), root_name].map(OsStr.from_str)).cwd(temp).call!()?
+			Script.command("zip").base.args(["-X", "-D", "-q", "-r", Path.display(output_absolute), root_name].map(OsStr.from_str)).cwd(temp).call!()?
 			Script.pass!("Created: ${Path.display(output)}")
 		},
 	)

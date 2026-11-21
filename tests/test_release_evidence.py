@@ -78,9 +78,18 @@ class ReleaseEvidenceTests(unittest.TestCase):
             self.assertIn({"from": host["id"], "to": "rust-std-" + target, "relation": "contains"},
                           [{key: edge[key] for key in ["from", "to", "relation"]} for edge in edges])
         for target in ["x64musl", "arm64musl"]:
-            libc = by_name[f"targets/{target}/libc.a"]
-            self.assertTrue(any(edge["from"] == libc["id"] and edge["to"] == "musl-" + target
-                                and edge["relation"] == "contains" for edge in edges))
+            for runtime, names in [
+                ("musl", ["libc.a", "rcrt1.o"]),
+                ("libunwind", ["libunwind.a"]),
+                ("zig-runtime", ["libzigc.a", "libcompiler_rt.a"]),
+            ]:
+                group = f"{runtime}-{target}"
+                self.assertTrue(any(edge["from"] == "project" and edge["to"] == group
+                                    and edge["relation"] == "contains" for edge in edges))
+                for name in names:
+                    member = by_name[f"targets/{target}/{name}"]
+                    self.assertEqual([edge["from"] for edge in edges if edge["to"] == member["id"]
+                                      and edge["relation"] == "contains"], [group])
         self.assertTrue(any(edge["to"] == "rustc" and edge["relation"] == "dependsOn"
                             and edge["scope"] == "build" for edge in edges))
         self.assertFalse(any(edge["to"] == "rustc" and edge["relation"] == "contains" for edge in edges))
@@ -110,10 +119,13 @@ class ReleaseEvidenceTests(unittest.TestCase):
             subject.write_bytes(original + b"changed")
             self.check(manifest, inventory, destination, success=False)
             subject.write_bytes(original)
-            cdx = destination / (self.platform + ".cdx.json")
-            cdx.rename(destination / "missing.cdx.json")
-            self.check(manifest, inventory, destination, success=False)
-            (destination / "missing.cdx.json").rename(cdx)
+            for suffix in (".cdx.json", ".spdx-2.3.json", ".spdx.json"):
+                with self.subTest(sidecar=suffix):
+                    sidecar = destination / (self.platform + suffix)
+                    missing = destination / ("missing" + suffix)
+                    sidecar.rename(missing)
+                    self.check(manifest, inventory, destination, success=False)
+                    missing.rename(sidecar)
             data = read(inventory)
             data["target"] = "aarch64-darwin"
             inventory.write_text(json.dumps(data))

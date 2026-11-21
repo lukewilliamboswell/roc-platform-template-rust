@@ -16,7 +16,7 @@ jobs:
       contents: write
       pull-requests: read
     steps:
-      - uses: lukewilliamboswell/roc-automation/actions/publish-build-inputs@a25b5129340b9b2ad1744d20330b8ee4d38a1849 # a25b512
+      - uses: lukewilliamboswell/roc-automation/actions/publish-build-inputs@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7 # acc5efd
         env:
           GH_TOKEN: ${{ github.token }}
         with:

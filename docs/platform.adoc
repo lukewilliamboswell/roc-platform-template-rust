@@ -28,11 +28,8 @@ The Rust host owns allocation, process I/O and the generated ABI boundary.
 | `x64musl` | Linux x86_64 with musl | Ubuntu x86_64 runner
 | `arm64musl` | Linux ARM64 with musl | Ubuntu ARM64 runner
 | `arm64mac` | Apple Silicon macOS | Apple Silicon macOS runner
-| `x64mac` | Intel macOS | Cross-compiled only; native validation disabled pending upstream support
+| `x64mac` | Intel macOS | Intel macOS runner
 |===
 
 Every host is stored at `platform/targets/<target>/libhost.a` in the bundle.
-Cross-compilation is evidence that the host compiles; it does not establish
-native execution. Do not interpret the compatibility badge as Intel macOS
-validation. Native coverage is tracked in
-https://github.com/lukewilliamboswell/roc-automation/issues/101[roc-automation#101].
+CI and release validation run the archived examples on each native target.

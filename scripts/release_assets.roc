@@ -52,7 +52,7 @@ main! = |args| {
 	compiler = capture!("roc", ["version"])?.trim()
 	tooling = capture!("roc-stable", ["version"])?.trim()
 	commit = capture!("git", ["rev-parse", "HEAD"])?.trim()
-	Path.write_utf8!(Path.join(output, "release-notes.md"), "${authored}\n\nPlatform: ${url}\n\nTested source: `${commit}`\n\nProduct compiler: `${compiler}`\n\nTooling compiler: `${tooling}`\n\nEvery deliverable has SPDX 3.0.1, CycloneDX 1.7, a subject manifest and retained inventory beside it. The release attests the exact files.\n\nKnown composition gaps remain explicit in the inventories: target-specific Rust standard-library subcomponents, missing supplier SBOMs for the immutable linker-input release, compiler-generated API assets and embedded manual fonts. Independent admission validation and linker-input sidecar publication are tracked in [roc-automation #62](https://github.com/lukewilliamboswell/roc-automation/issues/62).\n")?
+	Path.write_utf8!(Path.join(output, "release-notes.md"), "${authored}\n\nPlatform: ${url}\n\nTested source: `${commit}`\n\nProduct compiler: `${compiler}`\n\nTooling compiler: `${tooling}`\n\nEvery deliverable has SPDX 3.0.1, SPDX 2.3, CycloneDX 1.7, a subject manifest and retained inventory beside it. The release attests the exact files.\n\nKnown composition gaps remain explicit in the inventories: target-specific Rust standard-library subcomponents, missing supplier SBOMs for the immutable linker-input release, compiler-generated API assets and embedded manual fonts. Independent linker-input sidecar publication is tracked in [roc-automation #116](https://github.com/lukewilliamboswell/roc-automation/issues/116).\n")?
 	Script.pass!("Packaged exact release candidate and authored notes; no publication performed.")
 }
 

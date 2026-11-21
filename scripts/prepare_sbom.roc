@@ -105,10 +105,12 @@ main! = |args| {
 				for target in ["x64musl", "arm64musl"] {
 					id = "${runtime.id}-${target}"
 					$components = $components.append(component(id, runtime.name, "vendored-in-zig-0.16.0", "https://ziglang.org/download/0.16.0/zig-0.16.0.tar.xz#${runtime.id}-${target}", runtime.license, target_system(target), ""))
-					members = $components.keep_if(|entry| entry.name.starts_with("targets/${target}/") and (if (runtime.id == "musl") entry.name.ends_with("/libc.a") or entry.name.ends_with("/crt1.o") else if (runtime.id == "libunwind") entry.name.ends_with("/libunwind.a") else entry.name.ends_with("/libzigc.a") or entry.name.ends_with("/libcompiler_rt.a")))
+					members = $components.keep_if(|entry| entry.name.starts_with("targets/${target}/") and (if (runtime.id == "musl") entry.name.ends_with("/libc.a") or entry.name.ends_with("/rcrt1.o") else if (runtime.id == "libunwind") entry.name.ends_with("/libunwind.a") else entry.name.ends_with("/libzigc.a") or entry.name.ends_with("/libcompiler_rt.a")))
 					Script.require!(!members.is_empty(), "Missing target runtime members for ${id}")?
+					$edges = $edges.append(edge("project", id, "contains", "", "The platform bundles this Zig-vendored runtime for the target"))
 					for member in members {
-						$edges = $edges.append(edge(member.id, id, "contains", "", "Exact target archive member contains this Zig-vendored runtime; source identities are in runtime/source.json"))
+						$edges = $edges.keep_if(|relation| !(relation.from == "project" and relation.to == member.id and relation.relation == "contains"))
+						$edges = $edges.append(edge(id, member.id, "contains", "", "Exact archive member supplied by this runtime; source identities are in runtime/source.json"))
 					}
 				}
 			}
@@ -137,7 +139,7 @@ main! = |args| {
 				$coverage = $coverage.append(coverage("generated-api-assets", "incomplete", "Compiler-generated CSS/JavaScript/assets are member-hashed; the compiler supplies no asset-level third-party composition inventory"))
 			}
 		} else {
-			$coverage = $coverage.append(coverage("manual-renderer-assets", "incomplete", "PDF contains renderer-generated layout and fonts; exact embedded font/runtime composition is not supplied by roc-docs tools-0.6.0"))
+			$coverage = $coverage.append(coverage("manual-renderer-assets", "incomplete", "PDF contains renderer-generated layout and fonts; exact embedded font/runtime composition is not supplied by roc-docs tools-0.12.0"))
 		}
 		if item.kind == "platform" {
 			$components = $components.append(component("rustc", "Rust compiler", "1.95.0", "https://static.rust-lang.org/dist/channel-rust-1.95.0.toml", "MIT OR Apache-2.0", "", ""))
@@ -149,7 +151,7 @@ main! = |args| {
 			$edges = $edges.append(edge("Subject", "roc", "dependsOn", "build", "Selected compiler generated this deliverable; its executable is not contained in it"))
 		}
 		if item.kind == "manual" {
-			$components = $components.append(component("roc-docs", "roc-docs", "tools-0.6.0", "https://github.com/lukewilliamboswell/roc-automation/releases/tag/tools-0.6.0", "UPL-1.0", "", ""))
+			$components = $components.append(component("roc-docs", "roc-docs", "tools-0.12.0", "https://github.com/lukewilliamboswell/roc-automation/releases/tag/tools-0.12.0", "UPL-1.0", "", ""))
 			$edges = $edges.append(edge("Subject", "roc-docs", "dependsOn", "build", "Pinned renderer generated the PDF; the renderer executable is not contained in it"))
 		}
 		empty : List(Str)
@@ -162,11 +164,11 @@ main! = |args| {
 		subject = Path.join(artifact_stage, "subject.json")
 		Path.write_utf8!(subject, Json.to_str({ filename: item.filename, version: options.release_version, target: "source", sha256: "", url: "https://github.com/${repository}/releases/download/${options.release_version}/${item.filename}" }))?
 		context = Path.join(artifact_stage, "context.json")
-		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.8.0" }))?
+		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.14.0" }))?
 		run!("blueprint-sbom", ["bind", Path.display(inventory), Path.display(subject), Path.display(context), Path.display(file)])?
 		manifest = "${Path.display(file)}.sbom-manifest.json"
 		run!("blueprint-sbom", ["check", "--manifest", manifest, "--inventory", Path.display(inventory), "--artifacts", Path.display(output)])?
-		for suffix in ["", ".spdx.json", ".cdx.json", ".sbom-manifest.json", ".sbom-inventory.json"] {
+		for suffix in ["", ".spdx.json", ".spdx-2.3.json", ".cdx.json", ".sbom-manifest.json", ".sbom-inventory.json"] {
 			asset = Path.utf8("${Path.display(file)}${suffix}")
 			Script.require_file!(asset)?
 			$assets = $assets.append(Path.display(asset))

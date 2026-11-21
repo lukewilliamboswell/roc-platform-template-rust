@@ -20,14 +20,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
       # Used only to reconstruct the 1.2.0 API if its immutable release has no
       # documentation archive. The site script verifies this compiler identity.
-      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+      - uses: lukewilliamboswell/roc-automation/actions/setup-roc-nightly@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
-          version: nightly-new-compiler
           nightly-tag: nightly-2026-10-28-bad769b
       - name: Render the manual
         run: blueprint run docs
