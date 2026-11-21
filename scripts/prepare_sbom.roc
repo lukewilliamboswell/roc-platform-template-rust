@@ -166,7 +166,7 @@ main! = |args| {
 		run!("blueprint-sbom", ["bind", Path.display(inventory), Path.display(subject), Path.display(context), Path.display(file)])?
 		manifest = "${Path.display(file)}.sbom-manifest.json"
 		run!("blueprint-sbom", ["check", "--manifest", manifest, "--inventory", Path.display(inventory), "--artifacts", Path.display(output)])?
-		for suffix in ["", ".spdx.json", ".cdx.json", ".sbom-manifest.json", ".sbom-inventory.json"] {
+		for suffix in ["", ".spdx.json", ".spdx-2.3.json", ".cdx.json", ".sbom-manifest.json", ".sbom-inventory.json"] {
 			asset = Path.utf8("${Path.display(file)}${suffix}")
 			Script.require_file!(asset)?
 			$assets = $assets.append(Path.display(asset))

@@ -110,10 +110,13 @@ class ReleaseEvidenceTests(unittest.TestCase):
             subject.write_bytes(original + b"changed")
             self.check(manifest, inventory, destination, success=False)
             subject.write_bytes(original)
-            cdx = destination / (self.platform + ".cdx.json")
-            cdx.rename(destination / "missing.cdx.json")
-            self.check(manifest, inventory, destination, success=False)
-            (destination / "missing.cdx.json").rename(cdx)
+            for suffix in (".cdx.json", ".spdx-2.3.json", ".spdx.json"):
+                with self.subTest(sidecar=suffix):
+                    sidecar = destination / (self.platform + suffix)
+                    missing = destination / ("missing" + suffix)
+                    sidecar.rename(missing)
+                    self.check(manifest, inventory, destination, success=False)
+                    missing.rename(sidecar)
             data = read(inventory)
             data["target"] = "aarch64-darwin"
             inventory.write_text(json.dumps(data))

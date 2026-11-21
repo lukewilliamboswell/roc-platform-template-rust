@@ -2,7 +2,7 @@
 
 `blueprint run prepare-sbom -- --release-version VERSION --bundle FILENAME --output-dir dist`
 uses the reviewed Blueprint 0.14.0 SBOM executable to inspect the resolved
-Blueprint specification and lock, bind SPDX 3.0.1 and CycloneDX 1.7 documents to
+Blueprint specification and lock, bind SPDX 3.0.1, SPDX 2.3 and CycloneDX 1.7 documents to
 each final deliverable, and check the documents against their inventory and
 actual subject bytes. The generated inventories, sidecar manifests and evidence
 are retained as release assets. Tooling is a build dependency; it is never
