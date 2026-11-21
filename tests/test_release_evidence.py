@@ -78,9 +78,18 @@ class ReleaseEvidenceTests(unittest.TestCase):
             self.assertIn({"from": host["id"], "to": "rust-std-" + target, "relation": "contains"},
                           [{key: edge[key] for key in ["from", "to", "relation"]} for edge in edges])
         for target in ["x64musl", "arm64musl"]:
-            libc = by_name[f"targets/{target}/libc.a"]
-            self.assertTrue(any(edge["from"] == libc["id"] and edge["to"] == "musl-" + target
-                                and edge["relation"] == "contains" for edge in edges))
+            for runtime, names in [
+                ("musl", ["libc.a", "rcrt1.o"]),
+                ("libunwind", ["libunwind.a"]),
+                ("zig-runtime", ["libzigc.a", "libcompiler_rt.a"]),
+            ]:
+                group = f"{runtime}-{target}"
+                self.assertTrue(any(edge["from"] == "project" and edge["to"] == group
+                                    and edge["relation"] == "contains" for edge in edges))
+                for name in names:
+                    member = by_name[f"targets/{target}/{name}"]
+                    self.assertEqual([edge["from"] for edge in edges if edge["to"] == member["id"]
+                                      and edge["relation"] == "contains"], [group])
         self.assertTrue(any(edge["to"] == "rustc" and edge["relation"] == "dependsOn"
                             and edge["scope"] == "build" for edge in edges))
         self.assertFalse(any(edge["to"] == "rustc" and edge["relation"] == "contains" for edge in edges))

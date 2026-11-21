@@ -107,8 +107,10 @@ main! = |args| {
 					$components = $components.append(component(id, runtime.name, "vendored-in-zig-0.16.0", "https://ziglang.org/download/0.16.0/zig-0.16.0.tar.xz#${runtime.id}-${target}", runtime.license, target_system(target), ""))
 					members = $components.keep_if(|entry| entry.name.starts_with("targets/${target}/") and (if (runtime.id == "musl") entry.name.ends_with("/libc.a") or entry.name.ends_with("/rcrt1.o") else if (runtime.id == "libunwind") entry.name.ends_with("/libunwind.a") else entry.name.ends_with("/libzigc.a") or entry.name.ends_with("/libcompiler_rt.a")))
 					Script.require!(!members.is_empty(), "Missing target runtime members for ${id}")?
+					$edges = $edges.append(edge("project", id, "contains", "", "The platform bundles this Zig-vendored runtime for the target"))
 					for member in members {
-						$edges = $edges.append(edge(member.id, id, "contains", "", "Exact target archive member contains this Zig-vendored runtime; source identities are in runtime/source.json"))
+						$edges = $edges.keep_if(|relation| !(relation.from == "project" and relation.to == member.id and relation.relation == "contains"))
+						$edges = $edges.append(edge(id, member.id, "contains", "", "Exact archive member supplied by this runtime; source identities are in runtime/source.json"))
 					}
 				}
 			}
