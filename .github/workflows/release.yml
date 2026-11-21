@@ -111,14 +111,14 @@ jobs:
           echo "key=$(cat .blueprint/host-fingerprint)" >> "$GITHUB_OUTPUT"
       - name: Restore only exactly matching native hosts
         id: host
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             platform/targets/*/libhost.a
             platform/targets/*/libhost.a.sha256
           key: host-${{ runner.os }}-${{ steps.host-key.outputs.key }}
       - name: Restore content-addressed linker inputs
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cache/roc-platform-template-rust/link-inputs
           key: linker-inputs-${{ hashFiles('runtime/link-inputs.lock.json') }}
@@ -168,7 +168,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Preserve the exact candidate files
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-assets
           path: ${{ steps.candidate.outputs.assets }}
@@ -197,7 +197,7 @@ jobs:
         with:
           version: nightly-new-compiler
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
@@ -233,7 +233,7 @@ jobs:
       id-token: write
     steps:
       # No checkout, candidate executable, Blueprint task or repository script.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
@@ -253,7 +253,7 @@ jobs:
     steps:
       # The shared publisher handles these inert files with its own reviewed
       # tooling: stage draft, upload, download/hash-verify, then publish once.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
