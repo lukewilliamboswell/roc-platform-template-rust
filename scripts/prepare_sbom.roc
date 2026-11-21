@@ -137,7 +137,7 @@ main! = |args| {
 				$coverage = $coverage.append(coverage("generated-api-assets", "incomplete", "Compiler-generated CSS/JavaScript/assets are member-hashed; the compiler supplies no asset-level third-party composition inventory"))
 			}
 		} else {
-			$coverage = $coverage.append(coverage("manual-renderer-assets", "incomplete", "PDF contains renderer-generated layout and fonts; exact embedded font/runtime composition is not supplied by roc-docs tools-0.6.0"))
+			$coverage = $coverage.append(coverage("manual-renderer-assets", "incomplete", "PDF contains renderer-generated layout and fonts; exact embedded font/runtime composition is not supplied by roc-docs tools-0.12.0"))
 		}
 		if item.kind == "platform" {
 			$components = $components.append(component("rustc", "Rust compiler", "1.95.0", "https://static.rust-lang.org/dist/channel-rust-1.95.0.toml", "MIT OR Apache-2.0", "", ""))
@@ -149,7 +149,7 @@ main! = |args| {
 			$edges = $edges.append(edge("Subject", "roc", "dependsOn", "build", "Selected compiler generated this deliverable; its executable is not contained in it"))
 		}
 		if item.kind == "manual" {
-			$components = $components.append(component("roc-docs", "roc-docs", "tools-0.6.0", "https://github.com/lukewilliamboswell/roc-automation/releases/tag/tools-0.6.0", "UPL-1.0", "", ""))
+			$components = $components.append(component("roc-docs", "roc-docs", "tools-0.12.0", "https://github.com/lukewilliamboswell/roc-automation/releases/tag/tools-0.12.0", "UPL-1.0", "", ""))
 			$edges = $edges.append(edge("Subject", "roc-docs", "dependsOn", "build", "Pinned renderer generated the PDF; the renderer executable is not contained in it"))
 		}
 		empty : List(Str)
@@ -162,7 +162,7 @@ main! = |args| {
 		subject = Path.join(artifact_stage, "subject.json")
 		Path.write_utf8!(subject, Json.to_str({ filename: item.filename, version: options.release_version, target: "source", sha256: "", url: "https://github.com/${repository}/releases/download/${options.release_version}/${item.filename}" }))?
 		context = Path.join(artifact_stage, "context.json")
-		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.8.0" }))?
+		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.14.0" }))?
 		run!("blueprint-sbom", ["bind", Path.display(inventory), Path.display(subject), Path.display(context), Path.display(file)])?
 		manifest = "${Path.display(file)}.sbom-manifest.json"
 		run!("blueprint-sbom", ["check", "--manifest", manifest, "--inventory", Path.display(inventory), "--artifacts", Path.display(output)])?

@@ -25,7 +25,7 @@ blueprint run check
 
 Committed examples use this checkout by relative path; release archives use an
 immutable bundle URL. Native compatibility is checked on Linux x86_64, Linux
-ARM64 and Apple Silicon macOS. Intel macOS is cross-compiled but unverified.
+ARM64, Apple Silicon macOS and Intel macOS.
 
 See [contributing](CONTRIBUTING.md) for changes, [security](SECURITY.md) for private
 reports, and the [issue tracker](https://github.com/lukewilliamboswell/roc-platform-template-rust/issues)

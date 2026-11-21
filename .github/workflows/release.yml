@@ -81,6 +81,7 @@ jobs:
     outputs:
       bundle_filename: ${{ steps.bundle.outputs.filename }}
       assets: ${{ steps.candidate.outputs.assets }}
+      asset-digests: ${{ steps.candidate.outputs.asset-digests }}
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
       artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
     steps:
@@ -167,6 +168,9 @@ jobs:
             echo 'assets<<RELEASE_ASSETS'
             cat dist/release-assets.txt
             echo 'RELEASE_ASSETS'
+            echo 'asset-digests<<RELEASE_DIGESTS'
+            while IFS= read -r asset; do sha256sum "$asset"; done < dist/release-assets.txt
+            echo 'RELEASE_DIGESTS'
           } >> "$GITHUB_OUTPUT"
       - name: Preserve the exact candidate files
         id: upload
@@ -186,18 +190,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-22.04, ubuntu-24.04-arm]
+        os: [macos-15, macos-15-intel, ubuntu-22.04, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
-        with:
-          install-nix: 'true'
-          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
-          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
-          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
       - uses: lukewilliamboswell/roc-automation/actions/setup-roc-nightly@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
@@ -205,11 +203,8 @@ jobs:
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
-      - name: Test the exact archived examples against the exact bundle
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-          BUNDLE: ${{ needs.build.outputs.bundle_filename }}
-        run: blueprint run examples -- --operation test --archive "dist/roc-platform-template-rust-examples-$VERSION.zip" --bundle "dist/$BUNDLE"
+      - name: Execute archived examples against the exact bundle
+        run: bash scripts/test-release-archive.sh
 
   runtime-tests:
     name: Runtime tooling regressions
@@ -244,6 +239,10 @@ jobs:
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
+      - name: Verify transferred candidate bytes
+        env:
+          CANDIDATE_DIGESTS: ${{ needs.build.outputs.asset-digests }}
+        run: printf '%s\n' "$CANDIDATE_DIGESTS" | sha256sum --check --strict
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: ${{ needs.build.outputs.assets }}
@@ -264,6 +263,10 @@ jobs:
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
+      - name: Verify transferred candidate bytes
+        env:
+          CANDIDATE_DIGESTS: ${{ needs.build.outputs.asset-digests }}
+        run: printf '%s\n' "$CANDIDATE_DIGESTS" | sha256sum --check --strict
       - uses: lukewilliamboswell/roc-automation/actions/publish-release@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           version: ${{ needs.validate.outputs.version }}
