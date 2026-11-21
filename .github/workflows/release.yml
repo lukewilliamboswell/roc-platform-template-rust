@@ -88,12 +88,14 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
-      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
+      - uses: lukewilliamboswell/roc-automation/actions/setup-roc-nightly@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
-          version: nightly-new-compiler
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
       - name: Check source and generated bindings at the exact release commit
         env:
@@ -190,12 +192,14 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
-      - uses: roc-lang/setup-roc@cbe782d6f165b89c87d99f50a59ac4f5f73b4427
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
+      - uses: lukewilliamboswell/roc-automation/actions/setup-roc-nightly@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
-          version: nightly-new-compiler
           nightly-tag: ${{ needs.validate.outputs.nightly-tag }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -217,9 +221,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
       - run: blueprint run runtime-cli-tests
 
   attest:
@@ -257,7 +264,7 @@ jobs:
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
-      - uses: lukewilliamboswell/roc-automation/actions/publish-release@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/publish-release@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           version: ${{ needs.validate.outputs.version }}
           prerelease: 'false'
@@ -277,9 +284,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
       - name: Render the manual and assemble the newly published API archive
         env:
           GH_TOKEN: ${{ github.token }}

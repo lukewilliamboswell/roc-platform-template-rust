@@ -43,9 +43,12 @@ jobs:
         env:
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: test "$EXPECTED_SHA" = "$GITHUB_SHA"
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
       - name: Test archive admission boundaries
         run: blueprint run runtime-cli-tests
       - name: Build and package target-scoped archives
@@ -79,9 +82,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@a25b5129340b9b2ad1744d20330b8ee4d38a1849
+      - uses: lukewilliamboswell/roc-automation/actions/setup-blueprint@acc5efdcd929b38e665cd3ae6e694d1c4887f9c7
         with:
           install-nix: 'true'
+          sha256-x86_64-linux: 75c0bafa081773da2a6210b5238ab6da0eef87ece8d4acecf7ad497e03adf796
+          sha256-aarch64-linux: 370e717c1db3ac1883ed416abddf04e90b2f81227d8805e238f08ff35b8ca2b9
+          sha256-aarch64-darwin: 0e7cc549582871410c4330e9d3f7970515fb83239057c274f524ecdaa15ea05d
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linker-input-build
