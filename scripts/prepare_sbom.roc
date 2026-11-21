@@ -105,7 +105,7 @@ main! = |args| {
 				for target in ["x64musl", "arm64musl"] {
 					id = "${runtime.id}-${target}"
 					$components = $components.append(component(id, runtime.name, "vendored-in-zig-0.16.0", "https://ziglang.org/download/0.16.0/zig-0.16.0.tar.xz#${runtime.id}-${target}", runtime.license, target_system(target), ""))
-					members = $components.keep_if(|entry| entry.name.starts_with("targets/${target}/") and (if (runtime.id == "musl") entry.name.ends_with("/libc.a") or entry.name.ends_with("/crt1.o") else if (runtime.id == "libunwind") entry.name.ends_with("/libunwind.a") else entry.name.ends_with("/libzigc.a") or entry.name.ends_with("/libcompiler_rt.a")))
+					members = $components.keep_if(|entry| entry.name.starts_with("targets/${target}/") and (if (runtime.id == "musl") entry.name.ends_with("/libc.a") or entry.name.ends_with("/rcrt1.o") else if (runtime.id == "libunwind") entry.name.ends_with("/libunwind.a") else entry.name.ends_with("/libzigc.a") or entry.name.ends_with("/libcompiler_rt.a")))
 					Script.require!(!members.is_empty(), "Missing target runtime members for ${id}")?
 					for member in members {
 						$edges = $edges.append(edge(member.id, id, "contains", "", "Exact target archive member contains this Zig-vendored runtime; source identities are in runtime/source.json"))

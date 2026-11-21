@@ -64,8 +64,8 @@ test! = |directory, target| {
 			output = Path.display(Path.join(temp, "smoke"))
 			cache = Path.display(Path.join(temp, "cache"))
 			prefix = ["env", "-u", "ZIG_LIB_DIR", "-u", "ZIG_LIBC", "ZIG_GLOBAL_CACHE_DIR=${cache}", "ZIG_LOCAL_CACHE_DIR=${cache}/local", zig, "cc", "-target", triple]
-			_ = Runtime.run!(prefix.concat(["-mcpu=baseline", "-O2", "-funwind-tables", "-c", "runtime/smoke.c", "-o", "${output}.o"]))?
-			_ = Runtime.run!(prefix.concat(["-static", "-nostdlib", "${Path.display(libraries)}/crt1.o", "${output}.o", "${Path.display(libraries)}/libunwind.a", "${Path.display(libraries)}/libc.a", "${Path.display(libraries)}/libzigc.a", "${Path.display(libraries)}/libcompiler_rt.a", "-o", output]))?
+			_ = Runtime.run!(prefix.concat(["-mcpu=baseline", "-O2", "-fPIE", "-funwind-tables", "-c", "runtime/smoke.c", "-o", "${output}.o"]))?
+			_ = Runtime.run!(prefix.concat(["-static", "-fPIE", "-nostdlib", "${Path.display(libraries)}/rcrt1.o", "${output}.o", "${Path.display(libraries)}/libunwind.a", "${Path.display(libraries)}/libc.a", "${Path.display(libraries)}/libzigc.a", "${Path.display(libraries)}/libcompiler_rt.a", "-o", output]))?
 			_ = Runtime.run!([output])?
 			Ok({})
 		},

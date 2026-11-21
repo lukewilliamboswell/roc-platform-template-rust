@@ -19,7 +19,7 @@ support functions required by Zig 0.16's musl/unwind archives.
 
 ## musl libc
 
-Files: `platform/targets/*/libc.a`, `platform/targets/*/crt1.o`
+Files: `platform/targets/*/libc.a`, `platform/targets/*/rcrt1.o`
 
 musl libc is licensed under the MIT License.
 
