@@ -34,10 +34,11 @@ whether their recipe is still current. These are related but distinct checks.
 
 == Producing and publishing a change
 
-The unprivileged `runtime-release.yml` workflow is dispatch-only. It builds both
-targets, tests each archive on its native architecture, emits canonical
-`build-input-release.json`, and attests that manifest and both archives. It has no
-repository or release write authority.
+The unprivileged `runtime-release.yml` workflow builds both targets and tests
+each archive on its native architecture. It runs for pull requests that change
+producer inputs and by manual dispatch. A release candidate dispatch attests
+the canonical `build-input-release.json` and both archives after the native
+tests pass. The workflow has no repository or release write authority.
 
 Use this order when the producer fingerprint changes:
 
