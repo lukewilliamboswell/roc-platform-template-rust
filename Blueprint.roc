@@ -8,7 +8,7 @@ app [config] { pf: platform "https://github.com/lukewilliamboswell/roc-blueprint
 
 import pf.Recipes
 
-tooling = { compiler: "nightly-2026-10-25-72704da" }
+tooling = { compiler: "nightly-2026-11-23-b5c77fc" }
 
 repository_policy = { schema_version: 2, roots: ["platform", "examples", "scripts"], test_roots: ["platform"], profiles: [{ name: "repository", path: "tests/repository-policy.roc.txt", definition: "profile", sha256: "9124908a4afb6274ba7b9c18749b95c7d74be7992adadafe30085b33667f3303" }] }
 
@@ -24,16 +24,16 @@ config = [
 		[
 			Overlays(["roc", "zig", "rust"]),
 			Programs([
+				Fetch("roc-stable", Recipes.roc_nightly(tooling.compiler)),
 				Fetch("roc-policy", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.12.0/roc-policy-{system}")),
 				Fetch("blueprint-sbom", Recipes.file("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.14.0/blueprint-sbom-{system}")),
 			]),
-			Command("roc-stable", "nix#rocpkgs.nightly-2026-10-25-72704da"),
 			# Every bundle the scripts depend on: `roc-stable deps scripts/check_all.roc`.
 			RocPackages([
 				"https://github.com/roc-lang/path/releases/download/4.0.0/7YfABZPwJAXtLBY2vm8FqMyGAtNxncCJ65HdNKHFGNnE.tar.zst",
 
 				"https://github.com/roc-lang/http/releases/download/1.0.0/6ZUwqYhCS8PU9Mo6MF7oV82ET2o7KYb57CLKDq4cq4sS.tar.zst",
-				"https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
+				"https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
 				"https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
 				"https://github.com/lukewilliamboswell/weaver/releases/download/0.9.0/7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77.tar.zst",
 			]),

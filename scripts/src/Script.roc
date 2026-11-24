@@ -11,10 +11,10 @@ import ansi.ANSI
 Script := [].{
 	Command := { base : Cmd.Command, program : OsStr }.{
 		run! = |self, args| {
-			command = self.base.args(args)
+			invocation = self.base.args(args)
 			display = Str.join_with([self.program].concat(args).map(OsStr.display), " ")
 			Stdout.line!("\n${heading("RUN", Cyan)} ${display}")?
-			command.call!()
+			invocation.call!()
 		}
 
 		capture! = |self, args, cwd, stdin|
