@@ -31,7 +31,7 @@ main! = |args| {
 	Path.create_all!(output)?
 	Script.require_file!(Path.join(output, options.bundle))?
 	url = "https://github.com/${repository}/releases/download/${options.release_version}/${options.bundle}"
-	run!("roc-stable", ["scripts/examples.roc", "--", "--operation", "package", "--release-version", options.release_version, "--platform-url", url, "--output", Path.display(Path.join(output, "roc-platform-template-rust-examples-${options.release_version}.zip"))])?
+	run!("roc-stable", ["scripts/examples.roc", "--operation", "package", "--release-version", options.release_version, "--platform-url", url, "--output", Path.display(Path.join(output, "roc-platform-template-rust-examples-${options.release_version}.zip"))])?
 	Env.with_temp_dir!(
 		|temp| {
 			run!("roc", ["docs", "platform/main.roc", "--output=${Path.display(temp)}", "--no-cache"])?

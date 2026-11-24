@@ -181,7 +181,7 @@ test! = |suite, archive, bundle| {
 						path = Path.join(staged, example.path)
 						Path.write_utf8!(path, RocSource.replace_platform(Path.read_utf8!(path)?, server.url())?)?
 					}
-					child = Script.roc_stable!()?.cmd([Path.to_os_str(script), OsStr.from_str("--"), OsStr.from_str("--operation"), OsStr.from_str("run"), OsStr.from_str("--suite"), Path.to_os_str(staged)])
+					child = Script.roc_stable!()?.cmd([Path.to_os_str(script), OsStr.from_str("--operation"), OsStr.from_str("run"), OsStr.from_str("--suite"), Path.to_os_str(staged)])
 						.envs([(OsStr.from_str("ROC_CACHE_DIR"), Path.to_os_str(Path.join(temp, "cache")))])
 						.stdout(Capture)
 						.stderr(Capture)

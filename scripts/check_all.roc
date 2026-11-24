@@ -98,7 +98,7 @@ check_worktree! = || {
 	Script.command("git").run!(["diff", "--check"].map(OsStr.from_str))
 }
 
-run_script! = |script, args| Script.roc_stable!()?.run!([script, "--"].concat(args).map(OsStr.from_str))
+run_script! = |script, args| Script.roc_stable!()?.run!([script].concat(args).map(OsStr.from_str))
 
 dependency_urls = |tree| tree.split_on("\n").join_map(|line| line.split_on(" ").keep_if(|word| word.starts_with("https://")))
 

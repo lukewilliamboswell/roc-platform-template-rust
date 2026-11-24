@@ -53,9 +53,9 @@ install_linker_inputs! = |selected, candidate| {
 	if musl.is_empty() {
 		Ok({})
 	} else if !candidate.is_empty() {
-		run!("roc-stable", ["scripts/runtime.roc", "--", "install-candidate", candidate])
+		run!("roc-stable", ["scripts/runtime.roc", "install-candidate", candidate])
 	} else {
-		run!("roc-stable", ["scripts/runtime.roc", "--", "fetch"].concat(musl.join_map(|target| ["--target", target])))
+		run!("roc-stable", ["scripts/runtime.roc", "fetch"].concat(musl.join_map(|target| ["--target", target])))
 	}
 }
 
