@@ -8,7 +8,7 @@ app [config] { pf: platform "https://github.com/lukewilliamboswell/roc-blueprint
 
 import pf.Recipes
 
-tooling = { compiler: "nightly-2026-11-23-b5c77fc" }
+tooling = { compiler: "nightly-2026-11-24-ff5e544" }
 
 repository_policy = { schema_version: 2, roots: ["platform", "examples", "scripts"], test_roots: ["platform"], profiles: [{ name: "repository", path: "tests/repository-policy.roc.txt", definition: "profile", sha256: "b1941151e6f31b681d643874d63640d340dd525c9b3a8c5dc9b83d5d82a50dda" }] }
 
