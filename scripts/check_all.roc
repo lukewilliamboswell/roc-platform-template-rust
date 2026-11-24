@@ -43,12 +43,13 @@ check_tooling! = || {
 		_ => return Script.fail!("Missing check script app header")
 	}
 	pin = RocSource.value_for(source, header, "roc")?
-	Script.require!(Path.read_utf8!(Path.utf8("Blueprint.roc"))?.contains("nix#rocpkgs.${pin}"), "Blueprint roc-stable must match the tooling script compiler")?
+	stable = Script.roc_stable!()?
+	version = stable.capture!(["version"], Path.utf8("."), [])?
+	Script.require!(Str.from_utf8_lossy(version).trim() == "Roc compiler version ${pin}", "Blueprint roc-stable must match the tooling script compiler")?
 	tracked_bytes = Script.command("git").capture!(["ls-files", "-z"].map(OsStr.from_str), Path.utf8("."), [])?
 	for name in Str.from_utf8_lossy(tracked_bytes).split_on(Str.from_utf8_lossy([0])) {
 		Script.require!(!(name == ".roc-version" or name.ends_with("/.roc-version") or name == ".github/roc-nightly.json"), "Forbidden compiler pin file: ${name}")?
 	}
-	stable = Script.roc_stable!()?
 	script_files = Files.roc_files!(Path.utf8("scripts"))?
 	stable.run!(["fmt", "--check"].map(OsStr.from_str).concat(script_files.map(Path.to_os_str)))?
 	for path in Files.direct_files!(Path.utf8("scripts"))? {

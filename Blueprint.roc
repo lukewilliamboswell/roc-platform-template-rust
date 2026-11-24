@@ -10,7 +10,7 @@ import pf.Recipes
 
 tooling = { compiler: "nightly-2026-11-23-b5c77fc" }
 
-repository_policy = { schema_version: 2, roots: ["platform", "examples", "scripts"], test_roots: ["platform"], profiles: [{ name: "repository", path: "tests/repository-policy.roc.txt", definition: "profile", sha256: "9124908a4afb6274ba7b9c18749b95c7d74be7992adadafe30085b33667f3303" }] }
+repository_policy = { schema_version: 2, roots: ["platform", "examples", "scripts"], test_roots: ["platform"], profiles: [{ name: "repository", path: "tests/repository-policy.roc.txt", definition: "profile", sha256: "b1941151e6f31b681d643874d63640d340dd525c9b3a8c5dc9b83d5d82a50dda" }] }
 
 config = [
 	Name("roc-platform-template-rust"),
