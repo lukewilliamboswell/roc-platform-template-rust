@@ -8,9 +8,9 @@ app [config] { pf: platform "https://github.com/lukewilliamboswell/roc-blueprint
 
 import pf.Recipes
 
-tooling = { compiler: "nightly-2026-11-24-ff5e544" }
+tooling = { compiler: "nightly-2026-11-25-d5a4f1e" }
 
-repository_policy = { schema_version: 2, roots: ["platform", "examples", "scripts"], test_roots: ["platform"], profiles: [{ name: "repository", path: "tests/repository-policy.roc.txt", definition: "profile", sha256: "fe60fecf57053ecf9d94fd7b54996a7359696391a1f0381343e4a79bfb2f2a2b" }] }
+repository_policy = { schema_version: 2, roots: ["platform", "examples", "scripts"], test_roots: ["platform"], profiles: [{ name: "repository", path: "tests/repository-policy.roc.txt", definition: "profile", sha256: "1cb499d9cfe1fca5191e24ccd7b345f82b821e7b2bb2d892d8cb18cd5519eedb" }] }
 
 config = [
 	Name("roc-platform-template-rust"),
