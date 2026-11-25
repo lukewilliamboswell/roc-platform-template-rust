@@ -2,16 +2,16 @@
   "schema_version": 1,
   "kind": "link-inputs",
   "repository": "lukewilliamboswell/roc-platform-template-rust",
-  "release": "linker-inputs-sha256-b7c1b66b2b03e6223d321333269d8cecfe097c25191e1675e9b2b7badb7d1528",
+  "release": "linker-inputs-sha256-c9b0f8525ddefd9e55a8c117f87052a2685397958f5786782ec032c7b885f559",
   "manifest": {
     "asset": "build-input-release.json",
-    "sha256": "b7c1b66b2b03e6223d321333269d8cecfe097c25191e1675e9b2b7badb7d1528"
+    "sha256": "c9b0f8525ddefd9e55a8c117f87052a2685397958f5786782ec032c7b885f559"
   },
   "source": {
-    "input_fingerprint": "b24532782d2a5e5569b24a1b7ac9cdefa117c26ecc75357d0451773280013ba7",
+    "input_fingerprint": "4be0d9f96424ae897a7034f7089c175e2832dee4b987ae0af8bc8776fc96f1c7",
     "ref": "refs/heads/upgrade-roc-tooling-2026-11-23",
     "repository": "lukewilliamboswell/roc-platform-template-rust",
-    "sha": "42416d5bfb46a1fd85eeb0ffbaa3cbec67a8311a",
+    "sha": "4356ef379b4fd63159975bddefe4d5a3718a4c94",
     "workflow": "lukewilliamboswell/roc-platform-template-rust/.github/workflows/runtime-release.yml"
   },
   "targets": {
