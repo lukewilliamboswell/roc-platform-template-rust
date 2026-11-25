@@ -164,7 +164,7 @@ main! = |args| {
 		subject = Path.join(artifact_stage, "subject.json")
 		Path.write_utf8!(subject, Json.to_str({ filename: item.filename, version: options.release_version, target: "source", sha256: "", url: "https://github.com/${repository}/releases/download/${options.release_version}/${item.filename}" }))?
 		context = Path.join(artifact_stage, "context.json")
-		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.14.0" }))?
+		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.15.0-rc.1" }))?
 		run!("blueprint-sbom", ["bind", Path.display(inventory), Path.display(subject), Path.display(context), Path.display(file)])?
 		manifest = "${Path.display(file)}.sbom-manifest.json"
 		run!("blueprint-sbom", ["check", "--manifest", manifest, "--inventory", Path.display(inventory), "--artifacts", Path.display(output)])?

@@ -1,4 +1,4 @@
-app [config] { pf: platform "https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.14.0/Erv2CTy8LJML6JuhvQ3WcmFpXSA6FnGPcfDTi1iFX9B8.tar.zst" }
+app [config] { pf: platform "https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.15.0-rc.1/FwWWY6PczB7QsUoWKgaLTuBGGajLjfA4MhaLD36sJxrN.tar.zst" }
 
 # Two compilers are in play. `roc-stable` is the pinned nightly that runs the
 # repository tooling in scripts/; its tag matches every script header. The
@@ -26,7 +26,7 @@ config = [
 			Programs([
 				Fetch("roc-stable", Recipes.roc_nightly(tooling.compiler)),
 				Fetch("roc-policy", Recipes.file("https://github.com/lukewilliamboswell/roc-automation/releases/download/tools-0.12.0/roc-policy-{system}")),
-				Fetch("blueprint-sbom", Recipes.file("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.14.0/blueprint-sbom-{system}")),
+				Fetch("blueprint-sbom", Recipes.file("https://github.com/lukewilliamboswell/roc-blueprint/releases/download/0.15.0-rc.1/blueprint-sbom-{system}")),
 			]),
 			# Every bundle the scripts depend on: `roc-stable deps scripts/check_all.roc`.
 			RocPackages([
