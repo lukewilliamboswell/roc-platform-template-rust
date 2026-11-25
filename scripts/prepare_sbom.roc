@@ -1,8 +1,8 @@
 #!/usr/bin/env roc-stable
 app [main!] {
 	ansi: "https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
-	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
-	roc: "nightly-2026-10-25-72704da",
+	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+	roc: "nightly-2026-11-25-d5a4f1e",
 	weaver: "https://github.com/lukewilliamboswell/weaver/releases/download/0.9.0/7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77.tar.zst",
 }
 
@@ -164,7 +164,7 @@ main! = |args| {
 		subject = Path.join(artifact_stage, "subject.json")
 		Path.write_utf8!(subject, Json.to_str({ filename: item.filename, version: options.release_version, target: "source", sha256: "", url: "https://github.com/${repository}/releases/download/${options.release_version}/${item.filename}" }))?
 		context = Path.join(artifact_stage, "context.json")
-		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.14.0" }))?
+		Path.write_utf8!(context, Json.to_str({ namespace: "https://github.com/${repository}/sbom/${commit}/${item.filename}/revision-1", revision: "1", created: stamp, author: "Person: Luke Boswell", generator: "Tool: blueprint-sbom-0.15.0-rc.1" }))?
 		run!("blueprint-sbom", ["bind", Path.display(inventory), Path.display(subject), Path.display(context), Path.display(file)])?
 		manifest = "${Path.display(file)}.sbom-manifest.json"
 		run!("blueprint-sbom", ["check", "--manifest", manifest, "--inventory", Path.display(inventory), "--artifacts", Path.display(output)])?

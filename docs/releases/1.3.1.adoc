@@ -1,0 +1,8 @@
+= 1.3.1
+
+This release updates the Rust host bindings for Roc
+`nightly-2026-11-25-d5a4f1e` and includes newly verified linker inputs for
+Linux x86_64 and ARM64.
+
+Update your application's platform URL to `{platform-url}`. The examples
+archive already uses that URL.

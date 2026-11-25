@@ -1,8 +1,8 @@
 #!/usr/bin/env roc-stable
 app [main!] {
 	ansi: "https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
-	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
-	roc: "nightly-2026-10-25-72704da",
+	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+	roc: "nightly-2026-11-25-d5a4f1e",
 }
 
 ## The aggregate pull-request check behind `blueprint run check`: tooling,
@@ -43,12 +43,13 @@ check_tooling! = || {
 		_ => return Script.fail!("Missing check script app header")
 	}
 	pin = RocSource.value_for(source, header, "roc")?
-	Script.require!(Path.read_utf8!(Path.utf8("Blueprint.roc"))?.contains("nix#rocpkgs.${pin}"), "Blueprint roc-stable must match the tooling script compiler")?
+	stable = Script.roc_stable!()?
+	version = stable.capture!(["version"], Path.utf8("."), [])?
+	Script.require!(Str.from_utf8_lossy(version).trim() == "Roc compiler version ${pin}", "Blueprint roc-stable must match the tooling script compiler")?
 	tracked_bytes = Script.command("git").capture!(["ls-files", "-z"].map(OsStr.from_str), Path.utf8("."), [])?
 	for name in Str.from_utf8_lossy(tracked_bytes).split_on(Str.from_utf8_lossy([0])) {
 		Script.require!(!(name == ".roc-version" or name.ends_with("/.roc-version") or name == ".github/roc-nightly.json"), "Forbidden compiler pin file: ${name}")?
 	}
-	stable = Script.roc_stable!()?
 	script_files = Files.roc_files!(Path.utf8("scripts"))?
 	stable.run!(["fmt", "--check"].map(OsStr.from_str).concat(script_files.map(Path.to_os_str)))?
 	for path in Files.direct_files!(Path.utf8("scripts"))? {
@@ -98,7 +99,7 @@ check_worktree! = || {
 	Script.command("git").run!(["diff", "--check"].map(OsStr.from_str))
 }
 
-run_script! = |script, args| Script.roc_stable!()?.run!([script, "--"].concat(args).map(OsStr.from_str))
+run_script! = |script, args| Script.roc_stable!()?.run!([script].concat(args).map(OsStr.from_str))
 
 dependency_urls = |tree| tree.split_on("\n").join_map(|line| line.split_on(" ").keep_if(|word| word.starts_with("https://")))
 

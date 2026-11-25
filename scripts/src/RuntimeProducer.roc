@@ -52,6 +52,25 @@ RuntimeProducer := [].{
 		Path.write_bytes!(Path.join(root, "build-input-release.json"), canonical)
 	}
 
+	## The Zig project lists this mirror. It transports the same pinned bytes;
+	## the upstream URL remains the source identity recorded in the manifest.
+	download_zig! = |url, digest, archive| {
+		args = ["curl", "--fail", "--location", "--proto", "=https", "--silent", "--show-error", "--max-time", "120", "--output", Path.display(archive)]
+		provider = "https://ziglang.org/download/"
+		match url.drop_prefix(provider).split_on("/") {
+			[_, filename] if url.starts_with(provider) and filename.starts_with("zig-") and filename.ends_with(".tar.xz") => {
+				mirror = "https://pkg.hexops.org/zig/${filename}"
+				if Runtime.run!(args.append(mirror)).is_err() {
+					_ = Runtime.run!(args.append(url))?
+				}
+			}
+			_ => {
+				_ = Runtime.run!(args.append(url))?
+			}
+		}
+		Runtime.require!(Runtime.sha!(archive)? == digest, "Downloaded Zig archive SHA-256 differs from its reviewed pin")
+	}
+
 	## Tokenize the final linker command as data; never execute its shell text.
 	## Zig quotes paths with spaces, so a whitespace split can pick the wrong CRT.
 	shell_words = |line| {
@@ -101,8 +120,7 @@ build_inner! = |work, output| {
 	source = Json.parse(Path.read_utf8!(Path.utf8("runtime/source.json"))?)?
 	Runtime.require!(source.url.starts_with("https://") and Runtime.hex(source.sha256, 64), "Invalid reviewed Zig archive identity")?
 	archive = Path.join(work, "zig.tar.xz")
-	_ = Runtime.run!(["curl", "--fail", "--location", "--proto", "=https", "--max-time", "120", "--output", Path.display(archive), source.url])?
-	Runtime.require!(Runtime.sha!(archive)? == source.sha256, "Downloaded Zig archive differs from source pin")?
+	RuntimeProducer.download_zig!(source.url, source.sha256, archive)?
 	_ = Runtime.run!(["tar", "-xJf", Path.display(archive), "-C", Path.display(work)])?
 	zig_root = Path.join(work, "zig-x86_64-linux-${source.zig_version}")
 	zig = Path.join(zig_root, "zig")

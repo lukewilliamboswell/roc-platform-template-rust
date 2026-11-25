@@ -1,8 +1,8 @@
 #!/usr/bin/env roc-stable
 app [main!] {
 	ansi: "https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
-	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
-	roc: "nightly-2026-10-25-72704da",
+	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+	roc: "nightly-2026-11-25-d5a4f1e",
 	weaver: "https://github.com/lukewilliamboswell/weaver/releases/download/0.9.0/7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77.tar.zst",
 }
 
@@ -53,9 +53,9 @@ install_linker_inputs! = |selected, candidate| {
 	if musl.is_empty() {
 		Ok({})
 	} else if !candidate.is_empty() {
-		run!("roc-stable", ["scripts/runtime.roc", "--", "install-candidate", candidate])
+		run!("roc-stable", ["scripts/runtime.roc", "install-candidate", candidate])
 	} else {
-		run!("roc-stable", ["scripts/runtime.roc", "--", "fetch"].concat(musl.join_map(|target| ["--target", target])))
+		run!("roc-stable", ["scripts/runtime.roc", "fetch"].concat(musl.join_map(|target| ["--target", target])))
 	}
 }
 

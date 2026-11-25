@@ -1,7 +1,7 @@
 #!/usr/bin/env roc-stable
 app [main!] {
-	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
-	roc: "nightly-2026-10-25-72704da",
+	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+	roc: "nightly-2026-11-25-d5a4f1e",
 }
 
 import cli.Env
@@ -55,8 +55,7 @@ test! = |directory, target| {
 				Path.write_bytes!(Path.join(libraries, name), member.bytes)?
 			}
 			archive = Path.join(temp, "zig.tar.xz")
-			_ = Runtime.run!(["curl", "--fail", "--location", "--proto", "=https", "--max-time", "120", "--output", Path.display(archive), toolchain.url])?
-			Runtime.require!(Runtime.sha!(archive)? == toolchain.sha256, "Native Zig archive SHA-256 mismatch")?
+			RuntimeProducer.download_zig!(toolchain.url, toolchain.sha256, archive)?
 			_ = Runtime.run!(["tar", "-xf", Path.display(archive), "-C", Path.display(temp)])?
 			zig = Path.display(Path.join(temp, "${toolchain.directory}/zig"))
 			Runtime.require!(Runtime.run!([zig, "version"])?.trim() == source.zig_version, "Native Zig version differs from source pin")?

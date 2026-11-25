@@ -39,9 +39,7 @@ fn roc_host() -> &'static RocHost {
 
 fn stderr_line_ok() -> HostStderrLineResult {
     HostStderrLineResult {
-        payload: HostStderrLineResultPayload {
-            ok: [],
-        },
+        payload: HostStderrLineResultPayload { ok: [] },
         tag: HostStderrLineResultTag::Ok,
     }
 }
@@ -75,9 +73,7 @@ fn stdin_line_err(err: impl std::fmt::Display) -> HostStdinLineResult {
 
 fn stdout_line_ok() -> HostStdoutLineResult {
     HostStdoutLineResult {
-        payload: HostStdoutLineResultPayload {
-            ok: [],
-        },
+        payload: HostStdoutLineResultPayload { ok: [] },
         tag: HostStdoutLineResultTag::Ok,
     }
 }
@@ -132,38 +128,58 @@ pub extern "C" fn roc_stdout_line(message: RocStr) -> HostStdoutLineResult {
     }
 }
 
+/// # Safety
+/// The Roc host must be initialized. `alignment` must be valid for a Roc allocation of `length` bytes.
 #[no_mangle]
-pub extern "C" fn roc_alloc(length: usize, alignment: usize) -> *mut c_void {
-    DefaultAllocators::roc_alloc(roc_host_ptr(), length, alignment).as_ptr()
+pub unsafe extern "C" fn roc_alloc(length: usize, alignment: usize) -> *mut c_void {
+    unsafe { DefaultAllocators::roc_alloc(roc_host_ptr(), length, alignment).as_ptr() }
 }
 
+/// # Safety
+/// The Roc host must be initialized. `ptr` must be a live Roc allocation made with `alignment`.
 #[no_mangle]
-pub extern "C" fn roc_dealloc(ptr: *mut c_void, alignment: usize) {
-    DefaultAllocators::roc_dealloc(roc_host_ptr(), ptr, alignment);
+pub unsafe extern "C" fn roc_dealloc(ptr: *mut c_void, alignment: usize) {
+    unsafe {
+        DefaultAllocators::roc_dealloc(roc_host_ptr(), ptr, alignment);
+    }
 }
 
+/// # Safety
+/// The Roc host must be initialized. `ptr` must be a live Roc allocation made with `alignment`.
 #[no_mangle]
-pub extern "C" fn roc_realloc(
+pub unsafe extern "C" fn roc_realloc(
     ptr: *mut c_void,
     new_length: usize,
     alignment: usize,
 ) -> *mut c_void {
-    DefaultAllocators::roc_realloc(roc_host_ptr(), ptr, new_length, alignment).as_ptr()
+    unsafe { DefaultAllocators::roc_realloc(roc_host_ptr(), ptr, new_length, alignment).as_ptr() }
 }
 
+/// # Safety
+/// The Roc host must be initialized. `bytes` must be readable for `len` bytes for the duration of the call.
 #[no_mangle]
-pub extern "C" fn roc_dbg(bytes: *const u8, len: usize) {
-    DefaultHandlers::roc_dbg(roc_host_ptr(), bytes, len);
+pub unsafe extern "C" fn roc_dbg(bytes: *const u8, len: usize) {
+    unsafe {
+        DefaultHandlers::roc_dbg(roc_host_ptr(), bytes, len);
+    }
 }
 
+/// # Safety
+/// The Roc host must be initialized. `bytes` must be readable for `len` bytes for the duration of the call.
 #[no_mangle]
-pub extern "C" fn roc_expect_failed(bytes: *const u8, len: usize) {
-    DefaultHandlers::roc_expect_failed(roc_host_ptr(), bytes, len);
+pub unsafe extern "C" fn roc_expect_failed(bytes: *const u8, len: usize) {
+    unsafe {
+        DefaultHandlers::roc_expect_failed(roc_host_ptr(), bytes, len);
+    }
 }
 
+/// # Safety
+/// The Roc host must be initialized. `bytes` must be readable for `len` bytes for the duration of the call.
 #[no_mangle]
-pub extern "C" fn roc_crashed(bytes: *const u8, len: usize) {
-    DefaultHandlers::roc_crashed(roc_host_ptr(), bytes, len);
+pub unsafe extern "C" fn roc_crashed(bytes: *const u8, len: usize) {
+    unsafe {
+        DefaultHandlers::roc_crashed(roc_host_ptr(), bytes, len);
+    }
 }
 
 /// Build a RocList<RocStr> from the C `argc`/`argv`, program name first.

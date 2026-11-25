@@ -1,8 +1,8 @@
 #!/usr/bin/env roc-stable
 app [main!] {
 	ansi: "https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
-	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
-	roc: "nightly-2026-10-25-72704da",
+	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+	roc: "nightly-2026-11-25-d5a4f1e",
 	weaver: "https://github.com/lukewilliamboswell/weaver/releases/download/0.9.0/7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77.tar.zst",
 }
 
@@ -181,7 +181,7 @@ test! = |suite, archive, bundle| {
 						path = Path.join(staged, example.path)
 						Path.write_utf8!(path, RocSource.replace_platform(Path.read_utf8!(path)?, server.url())?)?
 					}
-					child = Script.roc_stable!()?.cmd([Path.to_os_str(script), OsStr.from_str("--"), OsStr.from_str("--operation"), OsStr.from_str("run"), OsStr.from_str("--suite"), Path.to_os_str(staged)])
+					child = Script.roc_stable!()?.cmd([Path.to_os_str(script), OsStr.from_str("--operation"), OsStr.from_str("run"), OsStr.from_str("--suite"), Path.to_os_str(staged)])
 						.envs([(OsStr.from_str("ROC_CACHE_DIR"), Path.to_os_str(Path.join(temp, "cache")))])
 						.stdout(Capture)
 						.stderr(Capture)

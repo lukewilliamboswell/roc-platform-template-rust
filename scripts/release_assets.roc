@@ -1,8 +1,8 @@
 #!/usr/bin/env roc-stable
 app [main!] {
 	ansi: "https://github.com/lukewilliamboswell/roc-ansi/releases/download/0.13.0/JXLM47L6CzrLXB5HBfqc27VnU6CD4jMm5Mk6dgbbovL.tar.zst",
-	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.26.0/GddgvsGjiNXrHFW6au5i5dUDbTs8FinQdrgE2Gqmw53t.tar.zst",
-	roc: "nightly-2026-10-25-72704da",
+	cli: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+	roc: "nightly-2026-11-25-d5a4f1e",
 	weaver: "https://github.com/lukewilliamboswell/weaver/releases/download/0.9.0/7j6KBFBEZ8pNMLQHkx9xiwyZ2PmwQPgKNDPUih6gKe77.tar.zst",
 }
 
@@ -31,7 +31,7 @@ main! = |args| {
 	Path.create_all!(output)?
 	Script.require_file!(Path.join(output, options.bundle))?
 	url = "https://github.com/${repository}/releases/download/${options.release_version}/${options.bundle}"
-	run!("roc-stable", ["scripts/examples.roc", "--", "--operation", "package", "--release-version", options.release_version, "--platform-url", url, "--output", Path.display(Path.join(output, "roc-platform-template-rust-examples-${options.release_version}.zip"))])?
+	run!("roc-stable", ["scripts/examples.roc", "--operation", "package", "--release-version", options.release_version, "--platform-url", url, "--output", Path.display(Path.join(output, "roc-platform-template-rust-examples-${options.release_version}.zip"))])?
 	Env.with_temp_dir!(
 		|temp| {
 			run!("roc", ["docs", "platform/main.roc", "--output=${Path.display(temp)}", "--no-cache"])?

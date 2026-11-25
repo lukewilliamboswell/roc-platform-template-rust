@@ -23,7 +23,7 @@ class NativeCandidateTests(unittest.TestCase):
         subprocess.run(['roc-stable', 'build', 'scripts/runtime_test.roc', f'--output={cls.binary}'],
                        cwd=ROOT, check=True, timeout=120)
 
-    def exercise(self, fail_link=False, mutate_sbom=None):
+    def exercise(self, fail_link=False, mutate_sbom=None, mirror="ok"):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name)
         (root / 'runtime').mkdir()
@@ -52,7 +52,7 @@ output.chmod(0o755)
             member.size = len(zig_script)
             archive.addfile(member, io.BytesIO(zig_script))
         source = json.loads((ROOT / 'runtime/source.json').read_text())
-        source.update(url='https://ziglang.org/fixture-zig.tar',
+        source.update(url='https://ziglang.org/download/0.16.0/zig-fixture.tar.xz',
                       sha256=hashlib.sha256(zig_archive.read_bytes()).hexdigest())
         (root / 'runtime/source.json').write_text(json.dumps(source))
         (root / 'runtime/test-toolchains.json').write_text(json.dumps({
@@ -75,8 +75,15 @@ output.chmod(0o755)
         tools.mkdir()
         curl = tools / 'curl'
         curl.write_text('#!' + sys.executable + '\n' +
-                        'import os, shutil, sys\n' +
-                        "shutil.copyfile(os.environ['FAKE_ZIG_ARCHIVE'], sys.argv[sys.argv.index('--output')+1])\n")
+                        'import os, pathlib, shutil, sys\n' +
+                        "url = sys.argv[-1]\n" +
+                        "with open(os.environ['FAKE_CURL_LOG'], 'a') as log: log.write(url + '\\n')\n" +
+                        "destination = sys.argv[sys.argv.index('--output')+1]\n" +
+                        "if url.startswith('https://pkg.hexops.org/'):\n" +
+                        "    if os.environ['FAKE_MIRROR'] == 'unavailable': sys.exit(22)\n" +
+                        "    if os.environ['FAKE_MIRROR'] == 'corrupt':\n" +
+                        "        pathlib.Path(destination).write_bytes(b'wrong archive'); sys.exit(0)\n" +
+                        "shutil.copyfile(os.environ['FAKE_ZIG_ARCHIVE'], destination)\n")
         curl.chmod(0o755)
         uname = tools / 'uname'
         uname.write_text('#!' + sys.executable + '\nimport sys\n' +
@@ -88,6 +95,7 @@ output.chmod(0o755)
         supplied.chmod(0o755)
         env = dict(os.environ, PATH=str(tools)+os.pathsep+os.environ['PATH'],
                    FAKE_ZIG_ARCHIVE=str(zig_archive), FAKE_ZIG_LOG=str(root / 'zig.log'),
+                   FAKE_CURL_LOG=str(root / 'curl.log'), FAKE_MIRROR=mirror,
                    FAKE_LINK_FAIL='1' if fail_link else '0', NATIVE_RAN=str(root / 'native-ran'),
                    FALLBACK_RAN=str(root / 'fallback-ran'))
         run = subprocess.run([str(self.binary), 'test', '--directory', str(root), '--target', 'x64musl'],
@@ -107,6 +115,25 @@ output.chmod(0o755)
             self.assertIn('-fPIE', commands[1])
             self.assertIn('-nostdlib', commands[1])
             self.assertNotIn(str(root / 'smoke-x64musl'), commands[1])
+
+    def test_unavailable_mirror_falls_back_to_the_reviewed_origin(self):
+        temp, root, run = self.exercise(mirror="unavailable")
+        with temp:
+            self.assertEqual(run.returncode, 0, run.stderr.decode(errors='replace'))
+            self.assertEqual((root / 'curl.log').read_text().splitlines(), [
+                'https://pkg.hexops.org/zig/zig-fixture.tar.xz',
+                'https://ziglang.org/download/0.16.0/zig-fixture.tar.xz',
+            ])
+            self.assertEqual((root / 'native-ran').read_text(), 'linked candidate')
+
+    def test_mirror_checksum_mismatch_fails_before_invoking_zig(self):
+        temp, root, run = self.exercise(mirror="corrupt")
+        with temp:
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn('Downloaded Zig archive SHA-256 differs from its reviewed pin',
+                          run.stderr.decode(errors='replace'))
+            self.assertFalse((root / 'zig.log').exists())
+            self.assertFalse((root / 'native-ran').exists())
 
     def test_link_failure_never_runs_supplied_or_new_smoke(self):
         temp, root, run = self.exercise(fail_link=True)
